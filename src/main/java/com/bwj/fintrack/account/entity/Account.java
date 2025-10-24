@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 public class Account {
 
     private static final Pattern ACCOUNT_NO_PATTERN = Pattern.compile("^\\d{3}-\\d{4}-\\d{7}$");
+    private static final int MONEY_SCALE = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,7 +67,7 @@ public class Account {
     @Version
     private Long version;
 
-    public static Account createActive(
+    public static Account createActiveUnchecked(
             User user,
             String accountNumber,
             BigDecimal initialBalance,
@@ -74,11 +75,10 @@ public class Account {
             BigDecimal minBalance,
             boolean autoTransfer
     ) {
-        validateAccountNo(accountNumber);
         Account a = new Account();
         a.user = user;
         a.accountNumber = accountNumber;
-        a.balance = s2(initialBalance != null ? initialBalance : BigDecimal.ZERO);
+        a.balance = roundToCurrencyOrZero(initialBalance);
         a.autoTransfer = autoTransfer;
         a.accountType = type;
         a.accountStatus = AccountStatus.ACTIVE;
@@ -86,44 +86,49 @@ public class Account {
         return a;
     }
 
-    public void ensureActive() {
-        if (accountStatus != AccountStatus.ACTIVE) {
-            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
-        }
-    }
-
-    public void deposit(BigDecimal amount) {
-        ensureActive();
-        requirePositive(amount);
-        this.balance = s2(this.balance.add(s2(amount)));
+    public static boolean isValidAccountNo(String no) {
+        return no != null && ACCOUNT_NO_PATTERN.matcher(no).matches();
     }
 
 
-    public void withdraw(BigDecimal amount) {
-        ensureActive();
-        requirePositive(amount);
-        BigDecimal after = s2(this.balance.subtract(s2(amount)));
-        if (minBalance != null && after.compareTo(minBalance) < 0) {
-            throw new CustomException(ErrorCode.MIN_BALANCE_VIOLATION);
-        }
-        if (after.compareTo(BigDecimal.ZERO) < 0) {
-            throw new CustomException(ErrorCode.INSUFFICIENT_BALANCE);
-        }
+    public boolean isActive() {
+        return accountStatus == AccountStatus.ACTIVE;
+    }
+
+    public static boolean isPositive(BigDecimal amount) {
+        return amount != null && amount.signum() > 0;
+    }
+
+    public ErrorCode reasonDepositInvalid(BigDecimal amount) {
+        if (!isActive()) return ErrorCode.ACCOUNT_NOT_ACTIVE;
+        if (!isPositive(amount)) return ErrorCode.AMOUNT_MUST_BE_POSITIVE;
+        return null;
+    }
+
+    public ErrorCode reasonWithdrawInvalid(BigDecimal amount) {
+        if (!isActive()) return ErrorCode.ACCOUNT_NOT_ACTIVE;
+        if (!isPositive(amount)) return ErrorCode.AMOUNT_MUST_BE_POSITIVE;
+
+        BigDecimal after = roundToCurrency(this.balance.subtract(roundToCurrency(amount)));
+        if (minBalance != null && after.compareTo(minBalance) < 0) return ErrorCode.MIN_BALANCE_VIOLATION;
+        if (after.compareTo(BigDecimal.ZERO) < 0) return ErrorCode.INSUFFICIENT_BALANCE;
+        return null;
+    }
+
+    public void applyDeposit(BigDecimal amount) {
+        this.balance = roundToCurrency(this.balance.add(roundToCurrency(amount)));
+    }
+
+    public void applyWithdraw(BigDecimal amount) {
+        BigDecimal after = roundToCurrency(this.balance.subtract(roundToCurrency(amount)));
         this.balance = after;
     }
 
-    private static BigDecimal s2(BigDecimal v) {
-        return v.setScale(2, RoundingMode.HALF_UP); }
-
-    private static void validateAccountNo(String no) {
-        if (no == null || !ACCOUNT_NO_PATTERN.matcher(no).matches()) {
-            throw new CustomException(ErrorCode.INVALID_ACCOUNT_NUMBER_FORMAT);
-        }
+    private static BigDecimal roundToCurrency(BigDecimal v) {
+        return v.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
-    private void requirePositive(BigDecimal amount) {
-        if (amount == null || amount.signum() <= 0) {
-            throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
-        }
+    private static BigDecimal roundToCurrencyOrZero(BigDecimal v) {
+        return (v == null) ? BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP) : roundToCurrency(v);
     }
 }

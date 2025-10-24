@@ -29,6 +29,7 @@ public enum ErrorCode {
     ACCOUNT_NOT_ACTIVE("활성화된 계좌가 아닙니다.", HttpStatus.BAD_REQUEST),
     MIN_BALANCE_VIOLATION("최소 유지 잔액을 충족하지 못합니다.", HttpStatus.BAD_REQUEST),
     INSUFFICIENT_BALANCE("잔액이 부족합니다.", HttpStatus.BAD_REQUEST),
+    ACCOUNT_NOT_FOUND("요청하신 계좌를 찾을 수 없습니다.",HttpStatus.NOT_FOUND),
 
 
 
