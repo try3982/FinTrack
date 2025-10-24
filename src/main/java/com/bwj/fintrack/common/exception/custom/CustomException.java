@@ -1,6 +1,7 @@
 package com.bwj.fintrack.common.exception.custom;
 
-import com.delivery.justonebite.global.exception.response.ErrorCode;
+
+import com.bwj.fintrack.common.exception.response.ErrorCode;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 

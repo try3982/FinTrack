@@ -1,5 +1,7 @@
-package com.bwj.fintrack.account;
+package com.bwj.fintrack.account.entity;
 
+import com.bwj.fintrack.common.exception.custom.CustomException;
+import com.bwj.fintrack.common.exception.response.ErrorCode;
 import com.bwj.fintrack.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -64,30 +66,29 @@ public class Account {
     @Version
     private Long version;
 
-
-    @Builder(builderMethodName = "of")
-    public static Account create(User user,
-                                 String accountNumber,
-                                 BigDecimal balance,
-                                 Boolean autoTransfer,
-                                 AccountType accountType,
-                                 AccountStatus accountStatus,
-                                 BigDecimal minBalance) {
+    public static Account createActive(
+            User user,
+            String accountNumber,
+            BigDecimal initialBalance,
+            AccountType type,
+            BigDecimal minBalance,
+            boolean autoTransfer
+    ) {
         validateAccountNo(accountNumber);
         Account a = new Account();
         a.user = user;
         a.accountNumber = accountNumber;
-        a.balance = balance != null ? balance : BigDecimal.ZERO;
-        a.autoTransfer = autoTransfer != null ? autoTransfer : Boolean.FALSE;
-        a.accountType = accountType;
-        a.accountStatus = accountStatus;
+        a.balance = s2(initialBalance != null ? initialBalance : BigDecimal.ZERO);
+        a.autoTransfer = autoTransfer;
+        a.accountType = type;
+        a.accountStatus = AccountStatus.ACTIVE;
         a.minBalance = minBalance;
         return a;
     }
 
     public void ensureActive() {
         if (accountStatus != AccountStatus.ACTIVE) {
-            throw new IllegalStateException("Account not active: " + accountStatus);
+            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
         }
     }
 
@@ -103,17 +104,12 @@ public class Account {
         requirePositive(amount);
         BigDecimal after = s2(this.balance.subtract(s2(amount)));
         if (minBalance != null && after.compareTo(minBalance) < 0) {
-            throw new IllegalStateException("Min balance violation");
+            throw new CustomException(ErrorCode.MIN_BALANCE_VIOLATION);
         }
         if (after.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalStateException("Insufficient balance");
+            throw new CustomException(ErrorCode.INSUFFICIENT_BALANCE);
         }
         this.balance = after;
-    }
-
-    public void changeAccountNumber(String newNo) {
-        validateAccountNo(newNo);
-        this.accountNumber = newNo;
     }
 
     private static BigDecimal s2(BigDecimal v) {
@@ -121,13 +117,13 @@ public class Account {
 
     private static void validateAccountNo(String no) {
         if (no == null || !ACCOUNT_NO_PATTERN.matcher(no).matches()) {
-            throw new IllegalArgumentException("Invalid account number format. Expected ###-####-#######");
+            throw new CustomException(ErrorCode.INVALID_ACCOUNT_NUMBER_FORMAT);
         }
     }
 
     private void requirePositive(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("amount must be > 0");
+            throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
         }
     }
 }
