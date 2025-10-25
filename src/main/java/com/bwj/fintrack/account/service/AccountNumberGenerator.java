@@ -3,11 +3,13 @@ package com.bwj.fintrack.account.service;
 import com.bwj.fintrack.account.repository.AccountRepository;
 import com.bwj.fintrack.common.exception.custom.CustomException;
 import com.bwj.fintrack.common.exception.response.ErrorCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 
 @Component
+@RequiredArgsConstructor
 public class AccountNumberGenerator {
 
     private final SecureRandom random = new SecureRandom();

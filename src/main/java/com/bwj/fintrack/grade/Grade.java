@@ -1,7 +1,7 @@
 package com.bwj.fintrack.grade;
 
 
-import com.bwj.fintrack.user.User;
+import com.bwj.fintrack.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

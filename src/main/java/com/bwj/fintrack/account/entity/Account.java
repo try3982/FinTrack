@@ -2,7 +2,7 @@ package com.bwj.fintrack.account.entity;
 
 import com.bwj.fintrack.common.exception.custom.CustomException;
 import com.bwj.fintrack.common.exception.response.ErrorCode;
-import com.bwj.fintrack.user.User;
+import com.bwj.fintrack.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -29,7 +29,6 @@ import java.util.regex.Pattern;
 public class Account {
 
     private static final Pattern ACCOUNT_NO_PATTERN = Pattern.compile("^\\d{3}-\\d{4}-\\d{7}$");
-    private static final int MONEY_SCALE = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,7 +66,7 @@ public class Account {
     @Version
     private Long version;
 
-    public static Account createActiveUnchecked(
+    public static Account createActive(
             User user,
             String accountNumber,
             BigDecimal initialBalance,
@@ -78,57 +77,69 @@ public class Account {
         Account a = new Account();
         a.user = user;
         a.accountNumber = accountNumber;
-        a.balance = roundToCurrencyOrZero(initialBalance);
+        a.balance = s2(initialBalance != null ? initialBalance : BigDecimal.ZERO);
         a.autoTransfer = autoTransfer;
         a.accountType = type;
         a.accountStatus = AccountStatus.ACTIVE;
-        a.minBalance = minBalance;
+        a.minBalance = minBalance != null ? s2(minBalance) : null;
         return a;
     }
 
-    public static boolean isValidAccountNo(String no) {
-        return no != null && ACCOUNT_NO_PATTERN.matcher(no).matches();
-    }
-
-
     public boolean isActive() {
-        return accountStatus == AccountStatus.ACTIVE;
+        return this.accountStatus == AccountStatus.ACTIVE;
     }
 
     public static boolean isPositive(BigDecimal amount) {
         return amount != null && amount.signum() > 0;
     }
 
-    public ErrorCode reasonDepositInvalid(BigDecimal amount) {
-        if (!isActive()) return ErrorCode.ACCOUNT_NOT_ACTIVE;
-        if (!isPositive(amount)) return ErrorCode.AMOUNT_MUST_BE_POSITIVE;
-        return null;
+    public static boolean isValidAccountNo(String no) {
+        return no != null && ACCOUNT_NO_PATTERN.matcher(no).matches();
     }
 
-    public ErrorCode reasonWithdrawInvalid(BigDecimal amount) {
-        if (!isActive()) return ErrorCode.ACCOUNT_NOT_ACTIVE;
-        if (!isPositive(amount)) return ErrorCode.AMOUNT_MUST_BE_POSITIVE;
+    public BigDecimal previewAfterDeposit(BigDecimal amount) {
+        return s2(this.balance.add(s2(amount)));
+    }
 
-        BigDecimal after = roundToCurrency(this.balance.subtract(roundToCurrency(amount)));
-        if (minBalance != null && after.compareTo(minBalance) < 0) return ErrorCode.MIN_BALANCE_VIOLATION;
-        if (after.compareTo(BigDecimal.ZERO) < 0) return ErrorCode.INSUFFICIENT_BALANCE;
-        return null;
+    public BigDecimal previewAfterWithdraw(BigDecimal amount) {
+        return s2(this.balance.subtract(s2(amount)));
+    }
+
+    public boolean wouldViolateMinBalance(BigDecimal after) {
+        return this.minBalance != null && after.compareTo(this.minBalance) < 0;
+    }
+
+    public boolean wouldGoNegative(BigDecimal after) {
+        return after.compareTo(BigDecimal.ZERO) < 0;
     }
 
     public void applyDeposit(BigDecimal amount) {
-        this.balance = roundToCurrency(this.balance.add(roundToCurrency(amount)));
+        this.balance = previewAfterDeposit(amount);
     }
 
     public void applyWithdraw(BigDecimal amount) {
-        BigDecimal after = roundToCurrency(this.balance.subtract(roundToCurrency(amount)));
-        this.balance = after;
+        this.balance = previewAfterWithdraw(amount);
     }
 
-    private static BigDecimal roundToCurrency(BigDecimal v) {
-        return v.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    public void ensureActive() {
+        if (accountStatus != AccountStatus.ACTIVE) {
+            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
+        }
     }
 
-    private static BigDecimal roundToCurrencyOrZero(BigDecimal v) {
-        return (v == null) ? BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP) : roundToCurrency(v);
+    public void deposit(BigDecimal amount) {
+        ensureActive();
+        requirePositive(amount);
+        this.balance = s2(this.balance.add(s2(amount)));
+    }
+
+    private static BigDecimal s2(BigDecimal v) {
+        return v.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void requirePositive(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
+        }
     }
 }
