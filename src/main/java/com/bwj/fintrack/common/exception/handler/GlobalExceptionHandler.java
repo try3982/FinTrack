@@ -2,13 +2,10 @@ package com.bwj.fintrack.common.exception.handler;
 
 import com.bwj.fintrack.common.exception.custom.CustomException;
 import com.bwj.fintrack.common.exception.response.ErrorResponse;
-import com.delivery.justonebite.global.exception.custom.CustomException;
-import com.delivery.justonebite.global.exception.response.ErrorResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -16,8 +13,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.nio.file.AccessDeniedException;
+
 import static com.bwj.fintrack.common.exception.response.ErrorCode.*;
-import static com.delivery.justonebite.global.exception.response.ErrorCode.*;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @RestControllerAdvice

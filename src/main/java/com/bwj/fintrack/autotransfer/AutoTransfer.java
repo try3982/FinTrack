@@ -1,7 +1,7 @@
 package com.bwj.fintrack.autotransfer;
 
 
-import com.bwj.fintrack.account.Account;
+import com.bwj.fintrack.account.entity.Account;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;

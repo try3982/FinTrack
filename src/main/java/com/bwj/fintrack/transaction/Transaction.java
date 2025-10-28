@@ -1,10 +1,9 @@
 package com.bwj.fintrack.transaction;
 
 
-import com.bwj.fintrack.account.Account;
+import com.bwj.fintrack.account.entity.Account;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;

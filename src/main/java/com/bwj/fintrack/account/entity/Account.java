@@ -1,6 +1,8 @@
-package com.bwj.fintrack.account;
+package com.bwj.fintrack.account.entity;
 
-import com.bwj.fintrack.user.User;
+import com.bwj.fintrack.common.exception.custom.CustomException;
+import com.bwj.fintrack.common.exception.response.ErrorCode;
+import com.bwj.fintrack.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -64,30 +66,64 @@ public class Account {
     @Version
     private Long version;
 
-
-    @Builder(builderMethodName = "of")
-    public static Account create(User user,
-                                 String accountNumber,
-                                 BigDecimal balance,
-                                 Boolean autoTransfer,
-                                 AccountType accountType,
-                                 AccountStatus accountStatus,
-                                 BigDecimal minBalance) {
-        validateAccountNo(accountNumber);
+    public static Account createActive(
+            User user,
+            String accountNumber,
+            BigDecimal initialBalance,
+            AccountType type,
+            BigDecimal minBalance,
+            boolean autoTransfer
+    ) {
         Account a = new Account();
         a.user = user;
         a.accountNumber = accountNumber;
-        a.balance = balance != null ? balance : BigDecimal.ZERO;
-        a.autoTransfer = autoTransfer != null ? autoTransfer : Boolean.FALSE;
-        a.accountType = accountType;
-        a.accountStatus = accountStatus;
-        a.minBalance = minBalance;
+        a.balance = s2(initialBalance != null ? initialBalance : BigDecimal.ZERO);
+        a.autoTransfer = autoTransfer;
+        a.accountType = type;
+        a.accountStatus = AccountStatus.ACTIVE;
+        a.minBalance = minBalance != null ? s2(minBalance) : null;
         return a;
+    }
+
+    public boolean isActive() {
+        return this.accountStatus == AccountStatus.ACTIVE;
+    }
+
+    public static boolean isPositive(BigDecimal amount) {
+        return amount != null && amount.signum() > 0;
+    }
+
+    public static boolean isValidAccountNo(String no) {
+        return no != null && ACCOUNT_NO_PATTERN.matcher(no).matches();
+    }
+
+    public BigDecimal previewAfterDeposit(BigDecimal amount) {
+        return s2(this.balance.add(s2(amount)));
+    }
+
+    public BigDecimal previewAfterWithdraw(BigDecimal amount) {
+        return s2(this.balance.subtract(s2(amount)));
+    }
+
+    public boolean wouldViolateMinBalance(BigDecimal after) {
+        return this.minBalance != null && after.compareTo(this.minBalance) < 0;
+    }
+
+    public boolean wouldGoNegative(BigDecimal after) {
+        return after.compareTo(BigDecimal.ZERO) < 0;
+    }
+
+    public void applyDeposit(BigDecimal amount) {
+        this.balance = previewAfterDeposit(amount);
+    }
+
+    public void applyWithdraw(BigDecimal amount) {
+        this.balance = previewAfterWithdraw(amount);
     }
 
     public void ensureActive() {
         if (accountStatus != AccountStatus.ACTIVE) {
-            throw new IllegalStateException("Account not active: " + accountStatus);
+            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
         }
     }
 
@@ -97,37 +133,13 @@ public class Account {
         this.balance = s2(this.balance.add(s2(amount)));
     }
 
-
-    public void withdraw(BigDecimal amount) {
-        ensureActive();
-        requirePositive(amount);
-        BigDecimal after = s2(this.balance.subtract(s2(amount)));
-        if (minBalance != null && after.compareTo(minBalance) < 0) {
-            throw new IllegalStateException("Min balance violation");
-        }
-        if (after.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalStateException("Insufficient balance");
-        }
-        this.balance = after;
-    }
-
-    public void changeAccountNumber(String newNo) {
-        validateAccountNo(newNo);
-        this.accountNumber = newNo;
-    }
-
     private static BigDecimal s2(BigDecimal v) {
-        return v.setScale(2, RoundingMode.HALF_UP); }
-
-    private static void validateAccountNo(String no) {
-        if (no == null || !ACCOUNT_NO_PATTERN.matcher(no).matches()) {
-            throw new IllegalArgumentException("Invalid account number format. Expected ###-####-#######");
-        }
+        return v.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void requirePositive(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("amount must be > 0");
+            throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
         }
     }
 }

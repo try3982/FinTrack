@@ -1,4 +1,4 @@
-package com.bwj.fintrack.user;
+package com.bwj.fintrack.user.entity;
 
 import com.bwj.fintrack.grade.Grade;
 import jakarta.persistence.*;
