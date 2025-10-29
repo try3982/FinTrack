@@ -2,6 +2,7 @@ package com.bwj.fintrack.account.controller;
 
 
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
+import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
 import com.bwj.fintrack.account.service.AccountService;
 import com.bwj.fintrack.transaction.dto.request.DepositRequest;
@@ -11,6 +12,7 @@ import com.bwj.fintrack.transaction.dto.response.DepositResponse;
 import com.bwj.fintrack.transaction.dto.response.TransferResponse;
 import com.bwj.fintrack.transaction.dto.response.WithdrawResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -51,5 +53,16 @@ public class AccountController {
     ) {
         TransferResponse body = accountService.transfer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+
+    @GetMapping("/{accountNumber}")
+    public ResponseEntity<AccountDetailResponse> getAccount(
+            @PathVariable
+            @Pattern(regexp = "^\\d{3}-\\d{4}-\\d{7}$", message = "계좌번호 형식이 올바르지 않습니다.")
+            String accountNumber
+    ) {
+        AccountDetailResponse body = accountService.getAccountByNumber(accountNumber);
+        return ResponseEntity.ok(body);
     }
 }
