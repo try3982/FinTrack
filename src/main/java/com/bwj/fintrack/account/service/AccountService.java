@@ -1,6 +1,7 @@
 package com.bwj.fintrack.account.service;
 
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
+import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
@@ -79,7 +80,7 @@ public class AccountService {
     public DepositResponse deposit(DepositRequest request) {
         validateAmount(request.amount());
 
-        Account account = accountRepository.findByAccountNumber(request.accountNumber())
+        Account account = accountRepository.findWithLockByAccountNumber(request.accountNumber())
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
         validateAccountOwner(account);
@@ -100,7 +101,7 @@ public class AccountService {
         validateAmount(request.amount());
 
         // 2) 계좌 조회 (입금과 동일하게 accountNumber 기반 조회)
-        Account account = accountRepository.findByAccountNumber(request.accountNumber())
+        Account account = accountRepository.findWithLockByAccountNumber(request.accountNumber())
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
         // 3) 권한/상태 검증 (입금과 동일)
@@ -181,6 +182,22 @@ public class AccountService {
         return TransferResponse.from(outTx, inTx);
     }
 
+    /**
+     * 계좌 단건 조회 (잔액 포함)
+     * - 입력: 계좌번호
+     * - 처리: 계좌 조회 → 소유자 검증(무인증 스텁) → 응답 DTO 변환
+     */
+    @Transactional(readOnly = true)
+    public AccountDetailResponse getAccountByNumber(String accountNumber) {
+        validateAccountNumberFormat(accountNumber);
+
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+
+        validateAccountOwner(account); // 무인증 단계: user 존재만 확인(스텁)
+
+        return AccountDetailResponse.from(account);
+    }
 
     // 초기 입금 최소 금액 정책 검증
     private void validateMinInitial(AccountType type, BigDecimal initialDeposit) {
@@ -305,4 +322,12 @@ public class AccountService {
     private void applyWithdraw(Account account, BigDecimal amount) {
         account.withdraw(amount);
     }
+
+    private void validateAccountNumberFormat(String accountNumber) {
+        if (!Account.isValidAccountNo(accountNumber)) {
+            throw new CustomException(ErrorCode.INVALID_ACCOUNT_NUMBER_FORMAT);
+        }
+    }
+
+
 }
