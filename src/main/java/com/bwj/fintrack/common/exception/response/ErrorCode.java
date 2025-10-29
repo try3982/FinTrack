@@ -32,6 +32,7 @@ public enum ErrorCode {
     ACCOUNT_NOT_FOUND("요청하신 계좌를 찾을 수 없습니다.",HttpStatus.NOT_FOUND),
 
 
+    FORBIDDEN_ACCOUNT_ACCESS("해당 계좌에 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
 
 
     ;
