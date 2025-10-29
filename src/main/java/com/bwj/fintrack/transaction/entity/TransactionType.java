@@ -1,4 +1,4 @@
-package com.bwj.fintrack.transaction;
+package com.bwj.fintrack.transaction.entity;
 
 public enum TransactionType {
 

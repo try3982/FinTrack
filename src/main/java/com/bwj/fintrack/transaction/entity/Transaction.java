@@ -1,4 +1,4 @@
-package com.bwj.fintrack.transaction;
+package com.bwj.fintrack.transaction.entity;
 
 
 import com.bwj.fintrack.account.entity.Account;
@@ -13,6 +13,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -66,5 +67,21 @@ public class Transaction {
     @PrePersist
     void prePersist() {
         if (transactionDate == null) transactionDate = LocalDateTime.now();
+    }
+
+    public static Transaction depositSuccess(Account account,
+                                             BigDecimal amount,
+                                             TransactionMethodType method,
+                                             String memo) {
+        return Transaction.builder()
+                .account(account)
+                .transactionType(TransactionType.DEPOSIT)
+                .transactionResultType(TransactionResultType.SUCCESS)
+                .transactionMethodType(method != null ? method : TransactionMethodType.ONLINE)
+                .amount(amount.setScale(2, RoundingMode.HALF_UP))
+                .balanceSnapshot(account.getBalance())
+                .fee(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
+                .memo(memo)
+                .build();
     }
 }
