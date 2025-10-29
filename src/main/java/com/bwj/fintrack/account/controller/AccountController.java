@@ -5,7 +5,9 @@ import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
 import com.bwj.fintrack.account.service.AccountService;
 import com.bwj.fintrack.transaction.dto.request.DepositRequest;
+import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
 import com.bwj.fintrack.transaction.dto.response.DepositResponse;
+import com.bwj.fintrack.transaction.dto.response.WithdrawResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -32,6 +34,12 @@ public class AccountController {
             @Valid @RequestBody DepositRequest request
     ) {
         DepositResponse body = accountService.deposit(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @PostMapping("/withdraw")
+    public ResponseEntity<WithdrawResponse> withdraw(@Valid @RequestBody WithdrawRequest request) {
+        WithdrawResponse body = accountService.withdraw(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 }
