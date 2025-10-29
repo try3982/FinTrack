@@ -2,7 +2,9 @@ package com.bwj.fintrack.account.service;
 
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
+import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
+import com.bwj.fintrack.transaction.dto.response.TransferResponse;
 import com.bwj.fintrack.transaction.dto.response.WithdrawResponse;
 import com.bwj.fintrack.account.entity.Account;
 import com.bwj.fintrack.account.entity.AccountType;
@@ -120,6 +122,65 @@ public class AccountService {
         // 7) 응답 변환 (레코드의 from 사용)
         return WithdrawResponse.from(saved);
     }
+
+    /**
+     * 계좌 이체
+     * - 금액 유효성 검증
+     * - 두 계좌(보내는/받는) 번호로 조회 (비관적 락은 일관된 순서로 획득 권장)
+     * - 권한/상태 검증
+     * - 금액 정규화
+     * - 출금→입금 적용 (원자적 @Transactional)
+     * - 거래내역 2건 저장 (TRANSFER_OUT / TRANSFER_IN)
+     * - 응답 변환
+     */
+    @Transactional
+    public TransferResponse transfer(TransferRequest request) {
+        // 1) 금액 검증
+        validateAmount(request.amount());
+
+        // 2) 자기계좌로 이체 방지(원하면 별도 ErrorCode 추가 가능)
+        if (request.fromAccountNumber().equals(request.toAccountNumber())) {
+            throw new CustomException(ErrorCode.INVALID_AMOUNT);
+        }
+
+        // 3) 동시성: 데드락 방지를 위해 일관된 순서로 락 획득
+        String a = request.fromAccountNumber();
+        String b = request.toAccountNumber();
+        final boolean swapped = a.compareTo(b) > 0;
+        String first = swapped ? b : a;
+        String second = swapped ? a : b;
+
+        Account firstAcc = accountRepository.findWithLockByAccountNumber(first)
+                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+        Account secondAcc = accountRepository.findWithLockByAccountNumber(second)
+                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+
+        Account from = swapped ? secondAcc : firstAcc;
+        Account to   = swapped ? firstAcc  : secondAcc;
+
+        // 4) 권한/상태 검증 (정책에 따라 from만 검증해도 되지만 여기선 양쪽 다 검증)
+        validateAccountOwner(from);
+        validateAccountActive(from);
+        validateAccountActive(to);
+
+        // 5) 금액 정규화
+        BigDecimal amount = normalizeAmount(request.amount());
+
+        // 6) 도메인 적용 (출금→입금)
+        from.withdraw(amount);
+        to.deposit(amount);
+
+        // 7) 거래내역 생성/저장 (반드시 '상태 적용 후' 스냅샷 사용)
+        Transaction outTx = Transaction.transferOutSuccess(from, amount, request.methodType(), request.memo());
+        Transaction inTx  = Transaction.transferInSuccess(to,   amount, request.methodType(), request.memo());
+
+        transactionRepository.save(outTx);
+        transactionRepository.save(inTx);
+
+        // 8) 응답 변환
+        return TransferResponse.from(outTx, inTx);
+    }
+
 
     // 초기 입금 최소 금액 정책 검증
     private void validateMinInitial(AccountType type, BigDecimal initialDeposit) {
