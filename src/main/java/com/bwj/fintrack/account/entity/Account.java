@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 
@@ -85,6 +86,32 @@ public class Account {
         return a;
     }
 
+    public void withdraw(BigDecimal amount) {
+        // 1) 상태/입력 검증 (도메인 불변식)
+        if (!isActive()) {
+            throw new DomainRuleViolation(DomainRuleViolation.Reason.INACTIVE);
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new DomainRuleViolation(DomainRuleViolation.Reason.NON_POSITIVE_AMOUNT);
+        }
+
+        // 2) 출금 후 잔액 계산 (스케일 고정 포함)
+        BigDecimal after = previewAfterWithdraw(amount); // == s2(this.balance - s2(amount))
+
+        // 3) 정책 위반 검증
+        if (wouldGoNegative(after)) {
+            throw new CustomException(ErrorCode.INSUFFICIENT_BALANCE);
+        }
+        if (wouldViolateMinBalance(after)) {
+            throw new  CustomException(ErrorCode.INSUFFICIENT_BALANCE);
+        }
+
+        // 4) 상태 적용
+        this.balance = after; // 최종 스케일은 previewAfterWithdraw가 보장
+    }
+
+
+
     public boolean isActive() {
         return this.accountStatus == AccountStatus.ACTIVE;
     }
@@ -128,9 +155,19 @@ public class Account {
     }
 
     public void deposit(BigDecimal amount) {
-        ensureActive();
-        requirePositive(amount);
-        this.balance = s2(this.balance.add(s2(amount)));
+        if (!isActive()) throw new DomainRuleViolation(DomainRuleViolation.Reason.INACTIVE);
+        if (amount == null || amount.signum() <= 0)
+            throw new DomainRuleViolation(DomainRuleViolation.Reason.NON_POSITIVE_AMOUNT);
+
+        BigDecimal normalized = s2(amount);           // 스케일 고정
+        this.balance = s2(this.balance.add(normalized));
+    }
+
+    public class DomainRuleViolation extends RuntimeException {
+        public enum Reason { INACTIVE, NON_POSITIVE_AMOUNT }
+        private final Reason reason;
+        public DomainRuleViolation(Reason reason) { this.reason = reason; }
+        public Reason reason() { return reason; }
     }
 
     private static BigDecimal s2(BigDecimal v) {

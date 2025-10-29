@@ -18,6 +18,7 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED("지원하지 않는 HTTP 메서드입니다.", HttpStatus.METHOD_NOT_ALLOWED),
     FORBIDDEN_ACCESS("접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
     USER_NOT_FOUND("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    INVALID_AMOUNT("유효하지 않은 금액 형식입니다.", HttpStatus.BAD_REQUEST),
 
 
     INITIAL_DEPOSIT_REQUIRED("초기 예치금이 필요합니다.", HttpStatus.BAD_REQUEST),
@@ -33,6 +34,8 @@ public enum ErrorCode {
 
 
     FORBIDDEN_ACCOUNT_ACCESS("해당 계좌에 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
+
+
 
 
     ;

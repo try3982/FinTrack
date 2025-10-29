@@ -84,4 +84,20 @@ public class Transaction {
                 .memo(memo)
                 .build();
     }
+
+    public static Transaction withdrawalSuccess(Account account,
+                                                BigDecimal amount,
+                                                TransactionMethodType method,
+                                                String memo) {
+        return Transaction.builder()
+                .account(account)
+                .transactionType(TransactionType.WITHDRAWAL)
+                .transactionResultType(TransactionResultType.SUCCESS)
+                .transactionMethodType(method != null ? method : TransactionMethodType.ONLINE)
+                .amount(amount.setScale(2, RoundingMode.HALF_UP))
+                .balanceSnapshot(account.getBalance())
+                .fee(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
+                .memo(memo)
+                .build();
+    }
 }

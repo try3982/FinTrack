@@ -2,6 +2,8 @@ package com.bwj.fintrack.account.service;
 
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
+import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
+import com.bwj.fintrack.transaction.dto.response.WithdrawResponse;
 import com.bwj.fintrack.account.entity.Account;
 import com.bwj.fintrack.account.entity.AccountType;
 import com.bwj.fintrack.account.repository.AccountRepository;
@@ -21,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
+
+import static com.bwj.fintrack.common.exception.response.ErrorCode.INSUFFICIENT_BALANCE;
+import static com.bwj.fintrack.common.exception.response.ErrorCode.MIN_BALANCE_VIOLATION;
 
 @Service
 @RequiredArgsConstructor
@@ -88,6 +92,34 @@ public class AccountService {
         return DepositResponse.from(saved);
     }
 
+    @Transactional
+    public WithdrawResponse withdraw(WithdrawRequest request) {
+        // 1) 금액 검증
+        validateAmount(request.amount());
+
+        // 2) 계좌 조회 (입금과 동일하게 accountNumber 기반 조회)
+        Account account = accountRepository.findByAccountNumber(request.accountNumber())
+                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+
+        // 3) 권한/상태 검증 (입금과 동일)
+        validateAccountOwner(account);
+        validateAccountActive(account);
+
+        // 4) 금액 스케일 정규화
+        BigDecimal amount = normalizeAmount(request.amount());
+
+        // 5) 도메인 적용 (입금과 동일하게 헬퍼 사용)
+        applyWithdraw(account, amount);
+
+        // 6) 거래내역 생성/저장 (입금과 대칭)
+        Transaction tx = Transaction.withdrawalSuccess(
+                account, amount, request.methodType(), request.memo()
+        );
+        Transaction saved = transactionRepository.save(tx);
+
+        // 7) 응답 변환 (레코드의 from 사용)
+        return WithdrawResponse.from(saved);
+    }
 
     // 초기 입금 최소 금액 정책 검증
     private void validateMinInitial(AccountType type, BigDecimal initialDeposit) {
@@ -157,7 +189,6 @@ public class AccountService {
         );
     }
 
-
     //Account 저장 (고유 제약 위반 시 DUPLICATE_ACCOUNT_NUMBER로 매핑)
     private Account saveAccount(Account account) {
         try {
@@ -210,6 +241,7 @@ public class AccountService {
         return (methodType != null) ? methodType : TransactionMethodType.ONLINE;
     }
 
-
-
+    private void applyWithdraw(Account account, BigDecimal amount) {
+        account.withdraw(amount);
+    }
 }
