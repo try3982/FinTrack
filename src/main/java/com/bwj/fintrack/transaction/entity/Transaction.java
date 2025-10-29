@@ -100,4 +100,40 @@ public class Transaction {
                 .memo(memo)
                 .build();
     }
+
+    public static Transaction transferOutSuccess(
+            com.bwj.fintrack.account.entity.Account from,
+            java.math.BigDecimal amount,
+            TransactionMethodType method,
+            String memo
+    ) {
+        return Transaction.builder()
+                .account(from)
+                .transactionType(TransactionType.TRANSFER_OUT)
+                .transactionResultType(TransactionResultType.SUCCESS)
+                .transactionMethodType(method != null ? method : TransactionMethodType.ONLINE)
+                .amount(amount.setScale(2, java.math.RoundingMode.HALF_UP))
+                .balanceSnapshot(from.getBalance()) // 출금 반영 후 잔액
+                .fee(java.math.BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP))
+                .memo(memo)
+                .build();
+    }
+
+    public static Transaction transferInSuccess(
+            com.bwj.fintrack.account.entity.Account to,
+            java.math.BigDecimal amount,
+            TransactionMethodType method,
+            String memo
+    ) {
+        return Transaction.builder()
+                .account(to)
+                .transactionType(TransactionType.TRANSFER_IN)
+                .transactionResultType(TransactionResultType.SUCCESS)
+                .transactionMethodType(method != null ? method : TransactionMethodType.ONLINE)
+                .amount(amount.setScale(2, java.math.RoundingMode.HALF_UP))
+                .balanceSnapshot(to.getBalance()) // 입금 반영 후 잔액
+                .fee(java.math.BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP))
+                .memo(memo)
+                .build();
+    }
 }
