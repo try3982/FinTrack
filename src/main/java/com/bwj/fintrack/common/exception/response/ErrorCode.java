@@ -34,6 +34,7 @@ public enum ErrorCode {
 
 
     FORBIDDEN_ACCOUNT_ACCESS("해당 계좌에 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
+    AUTO_TRANSFER_NOT_FOUND("자동이체 정보를를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
 
 
 
