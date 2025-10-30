@@ -1,10 +1,12 @@
 package com.bwj.fintrack.autotransfer.dto.response;
 
+ 
 import com.bwj.fintrack.autotransfer.entity.AutoTransfer;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+ 
 public record AutoTransferItemResponse(
         Long autoTransferId,
         String fromAccountNumber,
