@@ -194,7 +194,7 @@ public class AccountService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
-        validateAccountOwner(account); // 무인증 단계: user 존재만 확인(스텁)
+        validateAccountOwner(account);
 
         return AccountDetailResponse.from(account);
     }
@@ -210,6 +210,8 @@ public class AccountService {
             throw new CustomException(ErrorCode.INITIAL_DEPOSIT_BELOW_MIN);
         }
     }
+
+
 
     // 계좌번호 중복 여부 사전 검증
     private void ensureAccountNoIsUnique(String accountNo) {
@@ -328,6 +330,4 @@ public class AccountService {
             throw new CustomException(ErrorCode.INVALID_ACCOUNT_NUMBER_FORMAT);
         }
     }
-
-
 }
