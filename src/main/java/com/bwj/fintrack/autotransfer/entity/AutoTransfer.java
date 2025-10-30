@@ -163,4 +163,12 @@ public class AutoTransfer {
         // 사용자가 설정을 바꿨다는 건 새로운 조건으로 다시 시도할 거라는 의미이므로
         this.failCount = 0;
     }
+
+    public void deactivate() {
+        this.active = false;
+    }
+
+    public boolean isActive() {
+        return this.active;
+    }
 }
