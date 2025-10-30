@@ -12,4 +12,7 @@ public interface AutoTransferRepository extends JpaRepository<AutoTransfer, Long
     // active = true, nextRunAt <= now, failCount <= maxRetries
     // (isDue()로 한 번 더 필터링할 거라 기본 조건만 잡아도 됨)
     List<AutoTransfer> findByActiveIsTrueAndNextRunAtLessThanEqual(LocalDateTime now);
+
+    // 사용자 본인의 자동이체 규칙 목록 조회용
+    List<AutoTransfer> findByFromAccount_User_IdOrderByNextRunAtAsc(Long userId);
 }
