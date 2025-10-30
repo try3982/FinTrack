@@ -140,4 +140,27 @@ public class AutoTransfer {
         int day = Math.min(desiredDay, lastDay);
         return LocalDate.of(year, month, day);
     }
+
+    /**
+     * 자동이체 예약 정보를 수정한다.
+     * nextRunAt은 서비스에서 계산해준 값을 그대로 받는다.
+     * 정책적으로 failCount는 초기화(0)한다.
+     */
+    public void updateSchedule(String newToAccountNo,
+                               BigDecimal newAmount,
+                               Integer newDayOfMonth,
+                               String newRunTime,
+                               LocalDateTime newNextRunAt,
+                               boolean newActive) {
+
+        this.toAccountNo = newToAccountNo;
+        this.amount = newAmount;
+        this.dayOfMonth = newDayOfMonth;
+        this.runTime = newRunTime;
+        this.nextRunAt = newNextRunAt;
+        this.active = newActive;
+
+        // 사용자가 설정을 바꿨다는 건 새로운 조건으로 다시 시도할 거라는 의미이므로
+        this.failCount = 0;
+    }
 }
