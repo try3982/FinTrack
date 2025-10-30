@@ -1,5 +1,6 @@
 package com.bwj.fintrack.autotransfer.controller;
 
+import com.bwj.fintrack.autotransfer.dto.request.CancelAutoTransferRequest;
 import com.bwj.fintrack.autotransfer.dto.request.UpdateAutoTransferBody;
 import com.bwj.fintrack.autotransfer.dto.request.UpdateAutoTransferRequest;
 import com.bwj.fintrack.autotransfer.dto.response.AutoTransferItemResponse;
@@ -27,5 +28,16 @@ public class AutoTransferCommandController {
                 autoTransferCommandService.updateAutoTransfer(autoTransferId, body);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{autoTransferId}/cancel")
+    public ResponseEntity<AutoTransferItemResponse> cancelAutoTransfer(
+            @PathVariable Long autoTransferId,
+            @Valid @RequestBody CancelAutoTransferRequest request
+    ) {
+        AutoTransferItemResponse body =
+                autoTransferCommandService.cancelAutoTransfer(autoTransferId, request);
+
+        return ResponseEntity.ok(body);
     }
 }

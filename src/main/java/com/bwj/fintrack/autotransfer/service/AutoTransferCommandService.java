@@ -1,6 +1,7 @@
 package com.bwj.fintrack.autotransfer.service;
 
 
+import com.bwj.fintrack.autotransfer.dto.request.CancelAutoTransferRequest;
 import com.bwj.fintrack.autotransfer.dto.request.UpdateAutoTransferBody;
 import com.bwj.fintrack.autotransfer.dto.response.AutoTransferItemResponse;
 import com.bwj.fintrack.autotransfer.entity.AutoTransfer;
@@ -55,6 +56,33 @@ public class AutoTransferCommandService {
                 body.active()
         );
 
+        AutoTransfer saved = autoTransferRepository.save(at);
+        return AutoTransferItemResponse.from(saved);
+    }
+
+    @Transactional
+    public AutoTransferItemResponse cancelAutoTransfer(Long autoTransferId,
+                                                       CancelAutoTransferRequest request) {
+
+        // 1) 누가 요청했는지 확인 (인증 미도입 상태라 직접 받음)
+        if (request.userId() == null) {
+            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
+        }
+
+        // 2) 자동이체 엔티티 조회
+        AutoTransfer at = autoTransferRepository.findById(autoTransferId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AUTO_TRANSFER_NOT_FOUND));
+
+        // 3) 소유자 검증
+        if (at.getFromAccount().getUser() == null ||
+                !at.getFromAccount().getUser().getId().equals(request.userId())) {
+            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
+        }
+
+        // 4) 비활성화 (멱등: 이미 비활성화 상태여도 그냥 false 유지)
+        at.deactivate();
+
+        // 5) 저장 후 반환
         AutoTransfer saved = autoTransferRepository.save(at);
         return AutoTransferItemResponse.from(saved);
     }
