@@ -87,6 +87,28 @@ public class Account {
         return a;
     }
 
+    public static Account createDeposit(
+            User user,
+            String accountNumber,
+            BigDecimal initialDeposit,
+            boolean autoTransfer
+    ) {
+        // 초기 입금액 검증
+        if (initialDeposit == null || initialDeposit.compareTo(BigDecimal.ZERO) < 0) {
+            throw new CustomException(ErrorCode.INVALID_INITIAL_DEPOSIT);
+        }
+
+        Account account = new Account();
+        account.user = user;
+        account.accountNumber = accountNumber;
+        account.balance = s2(initialDeposit);
+        account.autoTransfer = autoTransfer;
+        account.accountType = AccountType.DEPOSIT;
+        account.accountStatus = AccountStatus.ACTIVE;
+        account.minBalance = null;  // 예금은 최소 잔액 제한 없음
+        return account;
+    }
+
     public void withdraw(BigDecimal amount) {
         // 1) 상태/입력 검증 (도메인 불변식)
         if (!isActive()) {

@@ -45,6 +45,8 @@ public enum ErrorCode {
     ACCOUNT_RESTORE_EXPIRED("계좌 복원 가능 기간이 만료되었습니다",HttpStatus.BAD_REQUEST),
 
     ACCOUNT_RESTORE_FORBIDDEN("본인 소유의 계좌만 활성화할 수 있습니다",HttpStatus.FORBIDDEN),
+    INVALID_INITIAL_DEPOSIT( "초기 입금액은 0원 이상이어야 합니다",HttpStatus.BAD_REQUEST),
+    AMOUNT_EXCEEDS_LIMIT("단건거래 한도를 초과했습니다.", HttpStatus.BAD_REQUEST),
 
     ;
 
