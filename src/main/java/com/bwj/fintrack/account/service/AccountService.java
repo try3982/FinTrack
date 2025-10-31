@@ -3,6 +3,7 @@ package com.bwj.fintrack.account.service;
 
 import com.bwj.fintrack.account.dto.request.*;
 import com.bwj.fintrack.account.dto.response.*;
+import com.bwj.fintrack.autotransfer.service.TransactionLimitValidator;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
 import com.bwj.fintrack.transaction.dto.response.TransferResponse;
@@ -31,14 +32,13 @@ import java.math.RoundingMode;
 @RequiredArgsConstructor
 public class AccountService {
 
-    private static final BigDecimal MAX_TX_AMOUNT = new BigDecimal("10000000.00");
-    private static final BigDecimal MAX_BALANCE   = new BigDecimal("9999999999999.99");
 
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final AccountNumberGenerator numberGenerator;
     private final AccountValidator accountValidator;
+    private final TransactionLimitValidator transactionLimitValidator;
 
 
 
@@ -171,6 +171,14 @@ public class AccountService {
 
         BigDecimal amount = normalizeAmount(request.amount());
 
+        // 한도 규제
+        User owner = account.getUser();
+
+        //  등급별 일일 한도 검사
+        transactionLimitValidator.validateDailyLimit(owner, amount);
+
+
+
         // 잔액/최소유지금 정책
         accountValidator.validateWithdrawPossible(account, amount);
 
@@ -224,10 +232,16 @@ public class AccountService {
 
         BigDecimal amount = normalizeAmount(request.amount());
 
-        // 출금 가능 여부(잔액 등)
-        accountValidator.validateWithdrawPossible(from, amount);
+        BigDecimal fee = calculateTransferFee(from, to);
 
-        from.withdraw(amount);
+        User owner = from.getUser();
+        BigDecimal totalDebit = amount.add(fee);
+
+        // 출금 가능 여부(잔액 등)
+        transactionLimitValidator.validateDailyLimit(owner, totalDebit);
+        accountValidator.validateWithdrawPossible(from, totalDebit);
+
+        from.withdraw(totalDebit);
         to.deposit(amount);
 
         Transaction outTx = Transaction.transferOutSuccess(
@@ -334,6 +348,19 @@ public class AccountService {
         if (initialDeposit.compareTo(BigDecimal.valueOf(min)) < 0) {
             throw new CustomException(ErrorCode.INITIAL_DEPOSIT_BELOW_MIN);
         }
+    }
+
+    private BigDecimal calculateTransferFee(Account from, Account to) {
+        Long fromUserId = from.getUser().getId();
+        Long toUserId   = to.getUser().getId();
+
+        // 같은 사용자 소유 계좌 간 이체라면 수수료 없음
+        if (fromUserId.equals(toUserId)) {
+            return BigDecimal.ZERO;
+        }
+
+        // 타인에게 보내면 500원 부과
+        return new BigDecimal("500.00");
     }
 
     private User loadUser(Long userId) {
