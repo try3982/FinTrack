@@ -35,11 +35,13 @@ public enum ErrorCode {
 
     FORBIDDEN_ACCOUNT_ACCESS("해당 계좌에 접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
     AUTO_TRANSFER_NOT_FOUND("자동이체 정보를를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-
-
-
+    ACCOUNT_RESTORE_WINDOW_EXPIRED("복구 가능 기간이 지났습니다.",HttpStatus.BAD_REQUEST),
+    ACCOUNT_ALREADY_CLOSED  ("이미 닫힌 계좌입니다.",HttpStatus.CONFLICT),
+    ACCOUNT_BALANCE_NOT_ZERO("계좌 잔액이 0이어야 해지가 가능합니다.", HttpStatus.BAD_REQUEST),
+    ACCOUNT_CLOSE_FORBIDDEN("본인 소유의 계좌만 해지할 수 있습니다", HttpStatus.BAD_REQUEST),
 
     ;
+
 
     private final String description;
     private final HttpStatus status;

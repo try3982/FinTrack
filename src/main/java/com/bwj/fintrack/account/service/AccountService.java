@@ -1,7 +1,9 @@
 package com.bwj.fintrack.account.service;
 
+import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
 import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
+import com.bwj.fintrack.account.dto.response.CloseAccountResponse;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
@@ -197,6 +199,40 @@ public class AccountService {
         validateAccountOwner(account);
 
         return AccountDetailResponse.from(account);
+    }
+
+    /**
+     * 계좌 해지
+     * - userId가 소유한 계좌인지 확인
+     * - 계좌 도메인에 closeAccount() 명령
+     * - 결과 저장 후 응답 변환
+     */
+    @Transactional
+    public CloseAccountResponse closeAccount(CloseAccountRequest request) {
+
+        // 1) user 검사 (인증 미도입 상태라 직접 받음)
+        if (request.userId() == null) {
+            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
+        }
+
+        // 2) 계좌 조회
+        Account account = accountRepository.findByAccountNumber(request.accountNumber())
+                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+
+        // 3) 소유자 검증
+        if (account.getUser() == null ||
+                !account.getUser().getId().equals(request.userId())) {
+            throw new CustomException(ErrorCode.ACCOUNT_CLOSE_FORBIDDEN);
+        }
+
+        // 4) 도메인 명령 (잔액 0인지, 이미 닫혔는지 등은 내부에서 검증/예외)
+        account.closeAccount();
+
+        // 5) 저장
+        Account saved = accountRepository.save(account);
+
+        // 6) 응답 변환
+        return CloseAccountResponse.from(saved);
     }
 
     // 초기 입금 최소 금액 정책 검증
