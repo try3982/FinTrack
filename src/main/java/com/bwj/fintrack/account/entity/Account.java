@@ -203,4 +203,19 @@ public class Account {
             throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
         }
     }
+
+    public void restoreAccount() {
+        if (this.accountStatus != AccountStatus.CLOSED) {
+            throw new CustomException(ErrorCode.ACCOUNT_NOT_CLOSED);
+        }
+
+        // 복원 기간 만료 검증
+        if (this.restoreUntil == null || LocalDateTime.now().isAfter(this.restoreUntil)) {
+            throw new CustomException(ErrorCode.ACCOUNT_RESTORE_EXPIRED);
+        }
+
+        this.accountStatus = AccountStatus.ACTIVE;
+        this.closedAt = null;
+        this.restoreUntil = null;
+    }
 }

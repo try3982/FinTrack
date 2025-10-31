@@ -40,6 +40,12 @@ public enum ErrorCode {
     ACCOUNT_BALANCE_NOT_ZERO("계좌 잔액이 0이어야 해지가 가능합니다.", HttpStatus.BAD_REQUEST),
     ACCOUNT_CLOSE_FORBIDDEN("본인 소유의 계좌만 해지할 수 있습니다", HttpStatus.BAD_REQUEST),
 
+    ACCOUNT_NOT_CLOSED("해지된 계좌가 아닙니다",HttpStatus.BAD_REQUEST),
+
+    ACCOUNT_RESTORE_EXPIRED("계좌 복원 가능 기간이 만료되었습니다",HttpStatus.BAD_REQUEST),
+
+    ACCOUNT_RESTORE_FORBIDDEN("본인 소유의 계좌만 활성화할 수 있습니다",HttpStatus.FORBIDDEN),
+
     ;
 
 
