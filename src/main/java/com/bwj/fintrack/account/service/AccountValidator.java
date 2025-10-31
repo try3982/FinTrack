@@ -1,5 +1,8 @@
 package com.bwj.fintrack.account.service;
+import com.bwj.fintrack.account.dto.request.CreateSavingsAccountRequest;
 import com.bwj.fintrack.account.entity.Account;
+import com.bwj.fintrack.account.entity.AccountType;
+import com.bwj.fintrack.autotransfer.entity.AutoTransfer;
 import com.bwj.fintrack.common.exception.custom.CustomException;
 import com.bwj.fintrack.common.exception.response.ErrorCode;
 import org.springframework.stereotype.Component;
@@ -22,6 +25,7 @@ public class AccountValidator {
     // 시스템 정책 한도 (AccountService의 상수와 일치하도록 유지)
     private static final BigDecimal MAX_TX_AMOUNT = new BigDecimal("10000000.00");
 
+
     /**
      * 계좌가 해당 userId의 소유인지 검증
      * - account.getUser() == null 이거나
@@ -36,6 +40,8 @@ public class AccountValidator {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
         }
     }
+
+
 
     /**
      * 계좌가 거래 가능한 상태인지(예: ACTIVE) 검증
@@ -54,6 +60,8 @@ public class AccountValidator {
             throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
         }
     }
+
+
 
     /**
      * 거래 한도 검증 (정책에 따라 필요 시 사용)
@@ -112,4 +120,28 @@ public class AccountValidator {
             }
         }
     }
+
+    public void validateSavingsRequestPolicy(CreateSavingsAccountRequest request) {
+
+        BigDecimal minRequired = BigDecimal
+                .valueOf(AccountType.SAVINGS.getMinimumInitial()); // 예: 10000
+
+        // 초기 입금 검증
+        if (request.initialDeposit() == null
+                || request.initialDeposit().compareTo(minRequired) < 0) {
+            throw new CustomException(ErrorCode.INVALID_INITIAL_DEPOSIT_FOR_SAVINGS);
+        }
+
+        // 월 납입액 검증
+        if (request.monthlyAmount() == null
+                || request.monthlyAmount().compareTo(minRequired) < 0) {
+            throw new CustomException(ErrorCode.INVALID_MONTHLY_AMOUNT);
+        }
+
+        // 자동이체 미설정 불가
+        if (request.autoTransferId() == null) {
+            throw new CustomException(ErrorCode.AUTO_TRANSFER_REQUIRED);
+        }
+    }
+
 }
