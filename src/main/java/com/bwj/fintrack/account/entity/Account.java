@@ -11,6 +11,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -108,6 +109,29 @@ public class Account {
 
         // 4) 상태 적용
         this.balance = after; // 최종 스케일은 previewAfterWithdraw가 보장
+    }
+
+    /**
+     * 계좌 해지 도메인 규칙:
+     * - 이미 CLOSED면 안 됨
+     * - 잔액(balance)이 0.00이 아니면 안 됨
+     * - 상태를 CLOSED로 전환
+     * - closedAt 기록
+     * - restoreUntil = 지금부터 3개월 뒤
+     */
+    public void closeAccount() {
+        if (this.accountStatus == AccountStatus.CLOSED) {
+            throw new CustomException(ErrorCode.ACCOUNT_ALREADY_CLOSED);
+        }
+
+        // 잔액 0이어야 해지 가능
+        if (this.balance == null || this.balance.setScale(2, RoundingMode.HALF_UP).compareTo(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)) != 0) {
+            throw new CustomException(ErrorCode.ACCOUNT_BALANCE_NOT_ZERO);
+        }
+
+        this.accountStatus = AccountStatus.CLOSED;
+        this.closedAt = LocalDateTime.now();
+        this.restoreUntil = this.closedAt.plus(3, ChronoUnit.MONTHS);
     }
 
 

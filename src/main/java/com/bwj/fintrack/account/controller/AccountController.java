@@ -1,8 +1,10 @@
 package com.bwj.fintrack.account.controller;
 
 
+import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
 import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
+import com.bwj.fintrack.account.dto.response.CloseAccountResponse;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
 import com.bwj.fintrack.account.service.AccountService;
 import com.bwj.fintrack.transaction.dto.request.DepositRequest;
@@ -64,5 +66,13 @@ public class AccountController {
     ) {
         AccountDetailResponse body = accountService.getAccountByNumber(accountNumber);
         return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/close")
+    public ResponseEntity<CloseAccountResponse> closeAccount(
+            @Valid @RequestBody CloseAccountRequest request
+    ) {
+        CloseAccountResponse body = accountService.closeAccount(request);
+        return ResponseEntity.status(HttpStatus.OK).body(body);
     }
 }
