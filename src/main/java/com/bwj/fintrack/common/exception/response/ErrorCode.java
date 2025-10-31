@@ -48,6 +48,7 @@ public enum ErrorCode {
     INVALID_MONTHLY_AMOUNT("월 납입액은 최소 10,000원 이상이어야 합니다",HttpStatus.BAD_REQUEST),
     AUTO_TRANSFER_ACCESS_FORBIDDEN( "본인의 자동이체 설정만 사용할 수 있습니다",HttpStatus.FORBIDDEN),
     AUTO_TRANSFER_REQUIRED( "자동이체 설정이 필요합니다.",HttpStatus.BAD_REQUEST),
+    DAILY_LIMIT_EXCEEDED( "일일 출금/이체 한도를 초과했습니다.",HttpStatus.BAD_REQUEST),
 
 
     ;
