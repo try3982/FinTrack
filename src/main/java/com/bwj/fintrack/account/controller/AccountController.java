@@ -3,9 +3,11 @@ package com.bwj.fintrack.account.controller;
 
 import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
+import com.bwj.fintrack.account.dto.request.RestoreAccountRequest;
 import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
 import com.bwj.fintrack.account.dto.response.CloseAccountResponse;
 import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
+import com.bwj.fintrack.account.dto.response.RestoreAccountResponse;
 import com.bwj.fintrack.account.service.AccountService;
 import com.bwj.fintrack.transaction.dto.request.DepositRequest;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
@@ -74,5 +76,13 @@ public class AccountController {
     ) {
         CloseAccountResponse body = accountService.closeAccount(request);
         return ResponseEntity.status(HttpStatus.OK).body(body);
+    }
+
+    @PostMapping("/restore")
+    public ResponseEntity<RestoreAccountResponse> restoreAccount(
+            @Valid @RequestBody RestoreAccountRequest request
+    ) {
+        RestoreAccountResponse body = accountService.restoreAccount(request);
+        return ResponseEntity.ok(body);
     }
 }
