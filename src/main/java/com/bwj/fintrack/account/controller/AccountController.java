@@ -3,11 +3,9 @@ package com.bwj.fintrack.account.controller;
 
 import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
+import com.bwj.fintrack.account.dto.request.CreateDepositAccountRequest;
 import com.bwj.fintrack.account.dto.request.RestoreAccountRequest;
-import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
-import com.bwj.fintrack.account.dto.response.CloseAccountResponse;
-import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
-import com.bwj.fintrack.account.dto.response.RestoreAccountResponse;
+import com.bwj.fintrack.account.dto.response.*;
 import com.bwj.fintrack.account.service.AccountService;
 import com.bwj.fintrack.transaction.dto.request.DepositRequest;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
@@ -29,36 +27,21 @@ public class AccountController {
 
     private final AccountService accountService;
 
-    @PostMapping
-    public ResponseEntity<CreateAccountResponse> createAccount(
-            @Valid @RequestBody CreateAccountRequest request
-    ) {
-        CreateAccountResponse body = accountService.createAccount(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(body);
-    }
+//    @PostMapping
+//    public ResponseEntity<CreateAccountResponse> createAccount(
+//            @Valid @RequestBody CreateAccountRequest request
+//    ) {
+//        CreateAccountResponse body = accountService.createAccount(request);
+//        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+//    }
 
     @PostMapping("/deposit")
-    public ResponseEntity<DepositResponse> deposit(
-            @Valid @RequestBody DepositRequest request
+    public ResponseEntity<CreateDepositAccountResponse> createDepositAccount(
+            @Valid @RequestBody CreateDepositAccountRequest request
     ) {
-        DepositResponse body = accountService.deposit(request);
+        CreateDepositAccountResponse body = accountService.createDepositAccount(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
-
-    @PostMapping("/withdraw")
-    public ResponseEntity<WithdrawResponse> withdraw(@Valid @RequestBody WithdrawRequest request) {
-        WithdrawResponse body = accountService.withdraw(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(body);
-    }
-
-    @PostMapping("/transfer")
-    public ResponseEntity<TransferResponse> transfer(
-            @Valid @RequestBody TransferRequest request
-    ) {
-        TransferResponse body = accountService.transfer(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(body);
-    }
-
 
     @GetMapping("/{accountNumber}")
     public ResponseEntity<AccountDetailResponse> getAccount(

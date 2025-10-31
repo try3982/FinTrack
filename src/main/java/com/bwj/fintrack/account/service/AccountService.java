@@ -1,12 +1,11 @@
 package com.bwj.fintrack.account.service;
 
+
 import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
 import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
+import com.bwj.fintrack.account.dto.request.CreateDepositAccountRequest;
 import com.bwj.fintrack.account.dto.request.RestoreAccountRequest;
-import com.bwj.fintrack.account.dto.response.AccountDetailResponse;
-import com.bwj.fintrack.account.dto.response.CloseAccountResponse;
-import com.bwj.fintrack.account.dto.response.CreateAccountResponse;
-import com.bwj.fintrack.account.dto.response.RestoreAccountResponse;
+import com.bwj.fintrack.account.dto.response.*;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
 import com.bwj.fintrack.transaction.dto.response.TransferResponse;
@@ -31,9 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-import static com.bwj.fintrack.common.exception.response.ErrorCode.INSUFFICIENT_BALANCE;
-import static com.bwj.fintrack.common.exception.response.ErrorCode.MIN_BALANCE_VIOLATION;
-
 @Service
 @RequiredArgsConstructor
 public class AccountService {
@@ -46,20 +42,21 @@ public class AccountService {
     private final TransactionRepository transactionRepository;
     private final AccountNumberGenerator numberGenerator;
 
+    // 👇 새로 주입
+    private final AccountValidator accountValidator;
 
     @Transactional
     public CreateAccountResponse createAccount(CreateAccountRequest request) {
 
         validateMinInitial(request.type(), request.initialDeposit());
 
-        User owner = getUserOrThrow(request.userId());
-
         String accountNo = generateAccountNo();
-
         ensureAccountNoIsUnique(accountNo);
 
-        BigDecimal initial = toScale2(request.initialDeposit());
+        // (owner 조회 로직은 너 코드 일부 잘린 상태였는데, 기존 흐름 살린다고 가정)
+        User owner = getUserOrThrow(request.userId());
 
+        BigDecimal initial = toScale2(request.initialDeposit());
         BigDecimal policyMinBalance = computePolicyMinBalance(request.type());
 
         Account account = buildAccount(owner, accountNo, request, initial, policyMinBalance);
@@ -69,86 +66,104 @@ public class AccountService {
         return CreateAccountResponse.from(saved);
     }
 
+    @Transactional
+    public CreateDepositAccountResponse createDepositAccount(CreateDepositAccountRequest request) {
+
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        String accountNo = generateAccountNo();
+        ensureAccountNoIsUnique(accountNo);
+
+        Account account = Account.createDeposit(
+                user,
+                accountNo,
+                request.initialDeposit(),
+                request.autoTransfer()
+        );
+
+        Account saved = accountRepository.save(account);
+        return CreateDepositAccountResponse.from(saved);
+    }
 
     /**
-     * 입금 처리
-     * - 금액 유효성 검증
-     * - 계좌 조회(비관적 락)
-     * - (임시) 소유자 검증 스텁
-     * - 계좌 상태(Active) 검증
-     * - 금액 스케일 정규화 후 잔액 증가
-     * - 거래내역(입금) 생성/저장
-     * - 응답 DTO 변환
+     * 입금
      */
     @Transactional
     public DepositResponse deposit(DepositRequest request) {
-        validateAmount(request.amount());
+
+        // 금액 기본 검증 (양수, 한도)
+        accountValidator.validatePositiveAmount(request.amount());
+        accountValidator.validateMaxTxAmount(request.amount());
 
         Account account = accountRepository.findWithLockByAccountNumber(request.accountNumber())
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
-        validateAccountOwner(account);
-        validateAccountActive(account);
+        // 소유자 존재 여부 / 상태 검증
+        accountValidator.validateOwnerPresent(account);
+        accountValidator.validateActive(account);
 
         BigDecimal amount = normalizeAmount(request.amount());
-        applyDeposit(account, amount);
+        account.deposit(amount);
 
-        Transaction tx = Transaction.depositSuccess(account, amount, request.methodType(), request.memo());
+        Transaction tx = Transaction.depositSuccess(
+                account,
+                amount,
+                request.methodType(),
+                request.memo()
+        );
         Transaction saved = transactionRepository.save(tx);
 
         return DepositResponse.from(saved);
     }
 
+    /**
+     * 출금
+     */
     @Transactional
     public WithdrawResponse withdraw(WithdrawRequest request) {
-        // 1) 금액 검증
-        validateAmount(request.amount());
 
-        // 2) 계좌 조회 (입금과 동일하게 accountNumber 기반 조회)
+        accountValidator.validatePositiveAmount(request.amount());
+        accountValidator.validateMaxTxAmount(request.amount());
+
         Account account = accountRepository.findWithLockByAccountNumber(request.accountNumber())
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
-        // 3) 권한/상태 검증 (입금과 동일)
-        validateAccountOwner(account);
-        validateAccountActive(account);
+        accountValidator.validateOwnerPresent(account);
+        accountValidator.validateActive(account);
 
-        // 4) 금액 스케일 정규화
         BigDecimal amount = normalizeAmount(request.amount());
 
-        // 5) 도메인 적용 (입금과 동일하게 헬퍼 사용)
-        applyWithdraw(account, amount);
+        // 잔액/최소유지금 정책
+        accountValidator.validateWithdrawPossible(account, amount);
 
-        // 6) 거래내역 생성/저장 (입금과 대칭)
+        account.withdraw(amount);
+
         Transaction tx = Transaction.withdrawalSuccess(
-                account, amount, request.methodType(), request.memo()
+                account,
+                amount,
+                request.methodType(),
+                request.memo()
         );
         Transaction saved = transactionRepository.save(tx);
 
-        // 7) 응답 변환 (레코드의 from 사용)
         return WithdrawResponse.from(saved);
     }
 
     /**
-     * 계좌 이체
-     * - 금액 유효성 검증
-     * - 두 계좌(보내는/받는) 번호로 조회 (비관적 락은 일관된 순서로 획득 권장)
-     * - 권한/상태 검증
-     * - 금액 정규화
-     * - 출금→입금 적용 (원자적 @Transactional)
-     * - 거래내역 2건 저장 (TRANSFER_OUT / TRANSFER_IN)
-     * - 응답 변환
+     * 이체
      */
     @Transactional
     public TransferResponse transfer(TransferRequest request) {
-        // 1) 금액 검증
-        validateAmount(request.amount());
 
-        // 2) 자기계좌로 이체 방지(원하면 별도 ErrorCode 추가 가능)
         if (request.fromAccountNumber().equals(request.toAccountNumber())) {
             throw new CustomException(ErrorCode.INVALID_AMOUNT);
         }
 
-        // 3) 동시성: 데드락 방지를 위해 일관된 순서로 락 획득
+        accountValidator.validatePositiveAmount(request.amount());
+        accountValidator.validateMaxTxAmount(request.amount());
+
+        // 데드락 방지 순서대로 락 획득
         String a = request.fromAccountNumber();
         String b = request.toAccountNumber();
         final boolean swapped = a.compareTo(b) > 0;
@@ -163,123 +178,112 @@ public class AccountService {
         Account from = swapped ? secondAcc : firstAcc;
         Account to   = swapped ? firstAcc  : secondAcc;
 
-        // 4) 권한/상태 검증 (정책에 따라 from만 검증해도 되지만 여기선 양쪽 다 검증)
-        validateAccountOwner(from);
-        validateAccountActive(from);
-        validateAccountActive(to);
+        // 보내는 쪽: 소유자/상태 검증
+        accountValidator.validateOwnerPresent(from);
+        accountValidator.validateActive(from);
 
-        // 5) 금액 정규화
+        // 받는 쪽: 상태만 확인
+        accountValidator.validateActive(to);
+
         BigDecimal amount = normalizeAmount(request.amount());
 
-        // 6) 도메인 적용 (출금→입금)
+        // 출금 가능 여부(잔액 등)
+        accountValidator.validateWithdrawPossible(from, amount);
+
         from.withdraw(amount);
         to.deposit(amount);
 
-        // 7) 거래내역 생성/저장 (반드시 '상태 적용 후' 스냅샷 사용)
-        Transaction outTx = Transaction.transferOutSuccess(from, amount, request.methodType(), request.memo());
-        Transaction inTx  = Transaction.transferInSuccess(to,   amount, request.methodType(), request.memo());
+        Transaction outTx = Transaction.transferOutSuccess(
+                from,
+                amount,
+                request.methodType(),
+                request.memo()
+        );
+        Transaction inTx  = Transaction.transferInSuccess(
+                to,
+                amount,
+                request.methodType(),
+                request.memo()
+        );
 
         transactionRepository.save(outTx);
         transactionRepository.save(inTx);
 
-        // 8) 응답 변환
         return TransferResponse.from(outTx, inTx);
     }
 
     /**
-     * 계좌 단건 조회 (잔액 포함)
-     * - 입력: 계좌번호
-     * - 처리: 계좌 조회 → 소유자 검증(무인증 스텁) → 응답 DTO 변환
+     * 단건 조회
      */
     @Transactional(readOnly = true)
     public AccountDetailResponse getAccountByNumber(String accountNumber) {
-        validateAccountNumberFormat(accountNumber);
+
+        // 포맷 검증을 validator로 이관
+        accountValidator.validateAccountNumberFormat(accountNumber);
 
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
-        validateAccountOwner(account);
+        // 접근 가능한 계좌인지(현재는 "주인 없는 계좌는 금지")
+        accountValidator.validateOwnerPresent(account);
 
         return AccountDetailResponse.from(account);
     }
 
-    /**
-     * 계좌 해지
-     * - userId가 소유한 계좌인지 확인
-     * - 계좌 도메인에 closeAccount() 명령
-     * - 결과 저장 후 응답 변환
-     */
     @Transactional
     public CloseAccountResponse closeAccount(CloseAccountRequest request) {
-
-        // 1) user 검사 (인증 미도입 상태라 직접 받음)
         if (request.userId() == null) {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
         }
 
-        // 2) 계좌 조회
         Account account = accountRepository.findByAccountNumber(request.accountNumber())
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
-        // 3) 소유자 검증
+        // 본인 소유인지 (Close에서는 userId 비교까지 이미 하고 있으므로
+        // 여기 로직은 그대로 유지해도 되고, 추후 validator에 옮길 수 있음)
         if (account.getUser() == null ||
                 !account.getUser().getId().equals(request.userId())) {
             throw new CustomException(ErrorCode.ACCOUNT_CLOSE_FORBIDDEN);
         }
 
-        // 4) 도메인 명령 (잔액 0인지, 이미 닫혔는지 등은 내부에서 검증/예외)
         account.closeAccount();
 
-        // 5) 저장
         Account saved = accountRepository.save(account);
-
-        // 6) 응답 변환
         return CloseAccountResponse.from(saved);
     }
 
     @Transactional
     public RestoreAccountResponse restoreAccount(RestoreAccountRequest request) {
-
-        // 1) user 검사 (인증 미도입 상태라 직접 받음)
         if (request.userId() == null) {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
         }
 
-        // 2) 계좌 조회
         Account account = accountRepository.findByAccountNumber(request.accountNumber())
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
-        // 3) 소유자 검증
         if (account.getUser() == null ||
                 !account.getUser().getId().equals(request.userId())) {
             throw new CustomException(ErrorCode.ACCOUNT_RESTORE_FORBIDDEN);
         }
 
-        // 4) 도메인 명령 (CLOSED 상태인지, 복원 기간 만료 여부 등은 내부에서 검증/예외)
         account.restoreAccount();
 
-        // 5) 저장
         Account saved = accountRepository.save(account);
-
-        // 6) 응답 변환
         return RestoreAccountResponse.from(saved);
     }
 
-    // 초기 입금 최소 금액 정책 검증
+    // --- 아래는 기존의 private 유틸들 그대로 유지 ---
+
     private void validateMinInitial(AccountType type, BigDecimal initialDeposit) {
         if (initialDeposit == null) {
             throw new CustomException(ErrorCode.INITIAL_DEPOSIT_REQUIRED);
         }
         int min = type.getMinimumInitial();
-
         if (initialDeposit.compareTo(BigDecimal.valueOf(min)) < 0) {
             throw new CustomException(ErrorCode.INITIAL_DEPOSIT_BELOW_MIN);
         }
     }
 
-
-
-    // 계좌번호 중복 여부 사전 검증
     private void ensureAccountNoIsUnique(String accountNo) {
         if (accountRepository.existsByAccountNumber(accountNo)) {
             throw new CustomException(ErrorCode.DUPLICATE_ACCOUNT_NUMBER);
@@ -299,101 +303,42 @@ public class AccountService {
         return accountNumber;
     }
 
-    // 금액 스케일을 소수점 둘째 자리로 통일(HALF_UP)
     private BigDecimal normalizeAmount(BigDecimal amount) {
         return amount.setScale(2, RoundingMode.HALF_UP);
     }
 
-    //  값 스케일을 소수점 둘째 자리로 통일(HALF_UP)
     private BigDecimal toScale2(BigDecimal v) {
         return v.setScale(2, RoundingMode.HALF_UP);
     }
 
-    /**
-     * 계좌유형에 따른 정책 최소 유지잔액 계산
-     * - 예: 적금(SAVINGS)은 10,000원
-     * - 그 외 null(제약 없음)
-     */
     private BigDecimal computePolicyMinBalance(AccountType type) {
-        return (type == AccountType.SAVINGS) ? new BigDecimal("10000.00") : null;
+        return (type == AccountType.SAVINGS)
+                ? new BigDecimal("10000.00")
+                : null;
     }
 
     private Account buildAccount(
             User owner,
             String accountNumber,
             CreateAccountRequest req,
-            BigDecimal initial,
+            BigDecimal initialDeposit,
             BigDecimal policyMinBalance
     ) {
         return Account.createActive(
                 owner,
                 accountNumber,
-                initial,
+                initialDeposit,
                 req.type(),
                 policyMinBalance,
                 false
         );
     }
 
-    //Account 저장 (고유 제약 위반 시 DUPLICATE_ACCOUNT_NUMBER로 매핑)
     private Account saveAccount(Account account) {
         try {
             return accountRepository.save(account);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.DUPLICATE_ACCOUNT_NUMBER);
-        }
-    }
-
-    // 금액 유효성 검증 (null 또는 0 이하 금지)
-    private void validateAmount(BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new CustomException(ErrorCode.AMOUNT_MUST_BE_POSITIVE);
-        }
-    }
-
-    // 계좌 조회(비관적 락) - 미존재 시 ACCOUNT_NOT_FOUND
-    private Account getAccountOrThrowWithLock(Long accountId) {
-        return accountRepository.findById(accountId)
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
-    }
-
-    /**
-     * (임시) 계좌 소유자 검증 스텁
-     * - 현재는 사용자 연계만 확인
-     * - 추후 인증 도입 시 현재 사용자와 소유자 일치 여부를 검증하도록 교체
-     */
-    private void validateAccountOwner(Account account) {
-
-        if (account.getUser() == null) {
-            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
-        }
-        // TODO: 인증 도입 후 현재 사용자와 소유자 일치 여부 검증 추가
-    }
-
-    //계좌 상태 검증 (Active가 아니면 예외)
-    private void validateAccountActive(Account account) {
-        if (!account.isActive()) {
-            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
-        }
-    }
-
-    // 잔액 증가 적용 (Account 엔티티의 deposit 사용)
-    private void applyDeposit(Account account, BigDecimal amount) {
-        account.deposit(amount);
-    }
-
-   // 거래 방법 기본값  (null이면 ONLINE)
-    private TransactionMethodType resolveMethodType(TransactionMethodType methodType) {
-        return (methodType != null) ? methodType : TransactionMethodType.ONLINE;
-    }
-
-    private void applyWithdraw(Account account, BigDecimal amount) {
-        account.withdraw(amount);
-    }
-
-    private void validateAccountNumberFormat(String accountNumber) {
-        if (!Account.isValidAccountNo(accountNumber)) {
-            throw new CustomException(ErrorCode.INVALID_ACCOUNT_NUMBER_FORMAT);
         }
     }
 }

@@ -2,6 +2,7 @@ package com.bwj.fintrack.transaction.service;
 
 import com.bwj.fintrack.account.entity.Account;
 import com.bwj.fintrack.account.repository.AccountRepository;
+import com.bwj.fintrack.account.service.AccountValidator;
 import com.bwj.fintrack.common.exception.custom.CustomException;
 import com.bwj.fintrack.common.exception.response.ErrorCode;
 import com.bwj.fintrack.transaction.dto.request.TransactionHistoryRequest;
@@ -27,6 +28,7 @@ public class TransactionHistoryService {
 
     private final AccountRepository accountRepository;
     private final TransactionHistoryRepository transactionHistoryRepository;
+    private final AccountValidator accountValidator;
 
     @Transactional(readOnly = true)
     public TransactionHistoryPageResponse getTransactionHistory(TransactionHistoryRequest request) {
@@ -41,7 +43,11 @@ public class TransactionHistoryService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
 
         // 3) 본인 계좌인지 확인
-        if (account.getUser() == null || !account.getUser().getId().equals(request.userId())) {
+        // 여기서는 기존처럼 userId를 직접 비교한다.
+        // (원한다면 아래 비교 로직도 AccountValidator로 옮길 수 있음.
+        //   e.g. accountValidator.validateOwner(account, request.userId()) 형태로 확장)
+        if (account.getUser() == null ||
+                !account.getUser().getId().equals(request.userId())) {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
         }
 
@@ -74,7 +80,7 @@ public class TransactionHistoryService {
 
         boolean hasNext = slice.size() > size;
         if (hasNext) {
-            slice = slice.subList(0, size); // 현재 페이지에 해당하는 부분만 남긴다
+            slice = slice.subList(0, size);
         }
 
         // 8) nextCursor 생성
