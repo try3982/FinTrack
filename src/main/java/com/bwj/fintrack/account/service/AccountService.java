@@ -1,10 +1,7 @@
 package com.bwj.fintrack.account.service;
 
 
-import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
-import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
-import com.bwj.fintrack.account.dto.request.CreateDepositAccountRequest;
-import com.bwj.fintrack.account.dto.request.RestoreAccountRequest;
+import com.bwj.fintrack.account.dto.request.*;
 import com.bwj.fintrack.account.dto.response.*;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
@@ -41,30 +38,9 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final AccountNumberGenerator numberGenerator;
-
-    // 👇 새로 주입
     private final AccountValidator accountValidator;
 
-    @Transactional
-    public CreateAccountResponse createAccount(CreateAccountRequest request) {
 
-        validateMinInitial(request.type(), request.initialDeposit());
-
-        String accountNo = generateAccountNo();
-        ensureAccountNoIsUnique(accountNo);
-
-        // (owner 조회 로직은 너 코드 일부 잘린 상태였는데, 기존 흐름 살린다고 가정)
-        User owner = getUserOrThrow(request.userId());
-
-        BigDecimal initial = toScale2(request.initialDeposit());
-        BigDecimal policyMinBalance = computePolicyMinBalance(request.type());
-
-        Account account = buildAccount(owner, accountNo, request, initial, policyMinBalance);
-
-        Account saved = saveAccount(account);
-
-        return CreateAccountResponse.from(saved);
-    }
 
     @Transactional
     public CreateDepositAccountResponse createDepositAccount(CreateDepositAccountRequest request) {
@@ -84,6 +60,67 @@ public class AccountService {
 
         Account saved = accountRepository.save(account);
         return CreateDepositAccountResponse.from(saved);
+    }
+
+    @Transactional
+    public CreateSavingsAccountResponse createSavingsAccount(CreateSavingsAccountRequest request) {
+
+        // 1) 요청 정책 검증
+        //    - 최소 예치금 / 월 납입액 검증
+        //    - 자동이체 필수 여부 검증
+        //    - transferDay는 DTO @Min/@Max 가 첫 번째 방어선
+        BigDecimal minRequired = BigDecimal.valueOf(AccountType.SAVINGS.getMinimumInitial());
+        if (request.initialDeposit() == null
+                || request.initialDeposit().compareTo(minRequired) < 0) {
+            throw new CustomException(ErrorCode.INVALID_INITIAL_DEPOSIT_FOR_SAVINGS);
+        }
+        if (request.monthlyAmount() == null
+                || request.monthlyAmount().compareTo(minRequired) < 0) {
+            throw new CustomException(ErrorCode.INVALID_MONTHLY_AMOUNT);
+        }
+        if (request.autoTransferId() == null) {
+            throw new CustomException(ErrorCode.AUTO_TRANSFER_REQUIRED);
+        }
+
+        // 2) 사용자 조회
+        User user = userRepository.findById(request.userId())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 3) 계좌번호 생성 및 중복 확인
+        String accountNo = generateAccountNo();
+        ensureAccountNoIsUnique(accountNo);
+
+        // 4) 금액 정규화 (소수 둘째 자리로 맞춤)
+        BigDecimal normalizedInitial = toScale2(request.initialDeposit());
+        BigDecimal normalizedMonthly = toScale2(request.monthlyAmount());
+
+        // 5) 도메인 엔티티 생성
+        //    Account.createSavings(...)
+        //    - 적금 전용 규칙 적용 (자동이체 활성화, 계좌상태 ACTIVE, 최소 유지 잔액 등)
+        Account account = Account.createSavings(
+                user,
+                accountNo,
+                normalizedInitial,
+                normalizedMonthly
+        );
+
+        // 6) 저장
+        Account saved;
+        try {
+            saved = accountRepository.save(account);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.DUPLICATE_ACCOUNT_NUMBER);
+        }
+
+        // 7) 응답 DTO 변환
+        //    Savings는 추가로 월 납입액 / 이체일 / 자동이체 ID가 필요하므로
+        //    Response.from(...)에 그 값까지 넣어준다.
+        return CreateSavingsAccountResponse.from(
+                saved,
+                normalizedMonthly,
+                request.transferDay(),
+                request.autoTransferId()
+        );
     }
 
     /**
@@ -252,6 +289,21 @@ public class AccountService {
         return CloseAccountResponse.from(saved);
     }
 
+    private Account buildSavingsAccount(User user,
+                                        String accountNo,
+                                        CreateSavingsAccountRequest request) {
+
+        BigDecimal normalizedInitial = toScale2(request.initialDeposit());
+        BigDecimal normalizedMonthly = toScale2(request.monthlyAmount());
+
+        return Account.createSavings(
+                user,
+                accountNo,
+                normalizedInitial,
+                normalizedMonthly
+        );
+    }
+
     @Transactional
     public RestoreAccountResponse restoreAccount(RestoreAccountRequest request) {
         if (request.userId() == null) {
@@ -284,11 +336,25 @@ public class AccountService {
         }
     }
 
+    private User loadUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
     private void ensureAccountNoIsUnique(String accountNo) {
         if (accountRepository.existsByAccountNumber(accountNo)) {
             throw new CustomException(ErrorCode.DUPLICATE_ACCOUNT_NUMBER);
         }
     }
+
+    private Account persistAccountOrThrowIfDuplicate(Account account) {
+        try {
+            return accountRepository.save(account);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.DUPLICATE_ACCOUNT_NUMBER);
+        }
+    }
+
 
     private User getUserOrThrow(Long userId) {
         return userRepository.findById(userId)

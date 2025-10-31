@@ -109,6 +109,36 @@ public class Account {
         return account;
     }
 
+    public static Account createSavings(
+            User user,
+            String accountNumber,
+            BigDecimal initialDeposit,
+            BigDecimal monthlyAmount
+    ) {
+        // 적금 최소 금액 상수
+        BigDecimal minimumAmount = BigDecimal.valueOf(AccountType.SAVINGS.getMinimumInitial());
+
+        // 초기 입금액 검증
+        if (initialDeposit == null || initialDeposit.compareTo(minimumAmount) < 0) {
+            throw new CustomException(ErrorCode.INVALID_INITIAL_DEPOSIT_FOR_SAVINGS);
+        }
+
+        // 월 납입액 검증
+        if (monthlyAmount == null || monthlyAmount.compareTo(minimumAmount) < 0) {
+            throw new CustomException(ErrorCode.INVALID_MONTHLY_AMOUNT);
+        }
+
+        Account account = new Account();
+        account.user = user;
+        account.accountNumber = accountNumber;
+        account.balance = s2(initialDeposit);
+        account.autoTransfer = true;  // 적금은 자동이체 필수
+        account.accountType = AccountType.SAVINGS;
+        account.accountStatus = AccountStatus.ACTIVE;
+        account.minBalance = s2(monthlyAmount);  // 매월 납입을 위한 최소 잔액
+        return account;
+    }
+
     public void withdraw(BigDecimal amount) {
         // 1) 상태/입력 검증 (도메인 불변식)
         if (!isActive()) {

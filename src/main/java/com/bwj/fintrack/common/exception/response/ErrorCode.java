@@ -39,14 +39,16 @@ public enum ErrorCode {
     ACCOUNT_ALREADY_CLOSED  ("이미 닫힌 계좌입니다.",HttpStatus.CONFLICT),
     ACCOUNT_BALANCE_NOT_ZERO("계좌 잔액이 0이어야 해지가 가능합니다.", HttpStatus.BAD_REQUEST),
     ACCOUNT_CLOSE_FORBIDDEN("본인 소유의 계좌만 해지할 수 있습니다", HttpStatus.BAD_REQUEST),
-
     ACCOUNT_NOT_CLOSED("해지된 계좌가 아닙니다",HttpStatus.BAD_REQUEST),
-
     ACCOUNT_RESTORE_EXPIRED("계좌 복원 가능 기간이 만료되었습니다",HttpStatus.BAD_REQUEST),
-
     ACCOUNT_RESTORE_FORBIDDEN("본인 소유의 계좌만 활성화할 수 있습니다",HttpStatus.FORBIDDEN),
     INVALID_INITIAL_DEPOSIT( "초기 입금액은 0원 이상이어야 합니다",HttpStatus.BAD_REQUEST),
     AMOUNT_EXCEEDS_LIMIT("단건거래 한도를 초과했습니다.", HttpStatus.BAD_REQUEST),
+    INVALID_INITIAL_DEPOSIT_FOR_SAVINGS( "적금 계좌의 초기 입금액은 최소 10,000원 이상이어야 합니다",HttpStatus.BAD_REQUEST),
+    INVALID_MONTHLY_AMOUNT("월 납입액은 최소 10,000원 이상이어야 합니다",HttpStatus.BAD_REQUEST),
+    AUTO_TRANSFER_ACCESS_FORBIDDEN( "본인의 자동이체 설정만 사용할 수 있습니다",HttpStatus.FORBIDDEN),
+    AUTO_TRANSFER_REQUIRED( "자동이체 설정이 필요합니다.",HttpStatus.BAD_REQUEST),
+
 
     ;
 

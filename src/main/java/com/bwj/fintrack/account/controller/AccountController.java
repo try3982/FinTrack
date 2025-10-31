@@ -1,10 +1,7 @@
 package com.bwj.fintrack.account.controller;
 
 
-import com.bwj.fintrack.account.dto.request.CloseAccountRequest;
-import com.bwj.fintrack.account.dto.request.CreateAccountRequest;
-import com.bwj.fintrack.account.dto.request.CreateDepositAccountRequest;
-import com.bwj.fintrack.account.dto.request.RestoreAccountRequest;
+import com.bwj.fintrack.account.dto.request.*;
 import com.bwj.fintrack.account.dto.response.*;
 import com.bwj.fintrack.account.service.AccountService;
 import com.bwj.fintrack.transaction.dto.request.DepositRequest;
@@ -40,6 +37,14 @@ public class AccountController {
             @Valid @RequestBody CreateDepositAccountRequest request
     ) {
         CreateDepositAccountResponse body = accountService.createDepositAccount(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @PostMapping("/savings")
+    public ResponseEntity<CreateSavingsAccountResponse> createSavingsAccount(
+            @Valid @RequestBody CreateSavingsAccountRequest request
+    ) {
+        CreateSavingsAccountResponse body = accountService.createSavingsAccount(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
