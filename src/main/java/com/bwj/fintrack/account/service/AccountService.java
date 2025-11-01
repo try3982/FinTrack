@@ -6,9 +6,11 @@ import com.bwj.fintrack.account.dto.response.*;
 import com.bwj.fintrack.account.service.factory.DepositAccountFactory;
 //import com.bwj.fintrack.autotransfer.service.TransactionLimitValidator;
 import com.bwj.fintrack.account.service.factory.SavingsAccountFactory;
+import com.bwj.fintrack.autotransfer.service.TransactionLimitValidator;
 import com.bwj.fintrack.grade.service.GradePromotionService;
 import com.bwj.fintrack.transaction.command.DepositCommand;
 import com.bwj.fintrack.transaction.command.TransactionExecutor;
+import com.bwj.fintrack.transaction.command.TransferCommand;
 import com.bwj.fintrack.transaction.command.WithdrawCommand;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
@@ -44,7 +46,7 @@ public class AccountService {
     private final TransactionRepository transactionRepository;
     private final AccountNumberGenerator numberGenerator;
     private final AccountValidator accountValidator;
-   // private final TransactionLimitValidator transactionLimitValidator;
+    private final TransactionLimitValidator transactionLimitValidator;
     private final GradePromotionService gradePromotionService;
 
 
@@ -119,71 +121,17 @@ public class AccountService {
     /**
      * 이체
      */
-    @Transactional
     public TransferResponse transfer(TransferRequest request) {
 
-       // gradePromotionService.evaluateAndPromote(request.userId());
-
-        if (request.fromAccountNumber().equals(request.toAccountNumber())) {
-            throw new CustomException(ErrorCode.INVALID_AMOUNT);
-        }
-
-        accountValidator.validatePositiveAmount(request.amount());
-        accountValidator.validateMaxTxAmount(request.amount());
-
-        // 데드락 방지 순서대로 락 획득
-        String a = request.fromAccountNumber();
-        String b = request.toAccountNumber();
-        final boolean swapped = a.compareTo(b) > 0;
-        String first = swapped ? b : a;
-        String second = swapped ? a : b;
-
-        Account firstAcc = accountRepository.findWithLockByAccountNumber(first)
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
-        Account secondAcc = accountRepository.findWithLockByAccountNumber(second)
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
-
-        Account from = swapped ? secondAcc : firstAcc;
-        Account to   = swapped ? firstAcc  : secondAcc;
-
-        // 보내는 쪽: 소유자/상태 검증
-        accountValidator.validateOwnerPresent(from);
-        accountValidator.validateActive(from);
-
-        // 받는 쪽: 상태만 확인
-        accountValidator.validateActive(to);
-
-        BigDecimal amount = normalizeAmount(request.amount());
-
-        BigDecimal fee = calculateTransferFee(from, to);
-
-        User owner = from.getUser();
-        BigDecimal totalDebit = amount.add(fee);
-
-        // 출금 가능 여부(잔액 등)
-      //  transactionLimitValidator.validateDailyLimit(owner, totalDebit);
-        accountValidator.validateWithdrawPossible(from, totalDebit);
-
-        from.withdraw(totalDebit);
-        to.deposit(amount);
-
-        Transaction outTx = Transaction.transferOutSuccess(
-                from,
-                amount,
-                request.methodType(),
-                request.memo()
-        );
-        Transaction inTx  = Transaction.transferInSuccess(
-                to,
-                amount,
-                request.methodType(),
-                request.memo()
+        TransferCommand command = new TransferCommand(
+                request,
+                accountRepository,
+                transactionRepository,
+                accountValidator,
+                transactionLimitValidator
         );
 
-        transactionRepository.save(outTx);
-        transactionRepository.save(inTx);
-
-        return TransferResponse.from(outTx, inTx);
+        return transactionExecutor.execute(command);
     }
 
     /**
