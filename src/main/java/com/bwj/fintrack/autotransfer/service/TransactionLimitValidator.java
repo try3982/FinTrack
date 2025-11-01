@@ -1,21 +1,21 @@
-//package com.bwj.fintrack.autotransfer.service;
-//
-//import com.bwj.fintrack.common.exception.custom.CustomException;
-//import com.bwj.fintrack.common.exception.response.ErrorCode;
-//import com.bwj.fintrack.grade.GradeType;
-//import com.bwj.fintrack.transaction.repository.TransactionRepository;
-//import com.bwj.fintrack.user.entity.User;
-//import lombok.RequiredArgsConstructor;
-//import org.springframework.stereotype.Component;
-//
-//import java.math.BigDecimal;
-//
-//@Component
-//@RequiredArgsConstructor
-//public class TransactionLimitValidator {
-//
-//    private final TransactionRepository transactionRepository;
-//
+package com.bwj.fintrack.autotransfer.service;
+
+import com.bwj.fintrack.common.exception.custom.CustomException;
+import com.bwj.fintrack.common.exception.response.ErrorCode;
+import com.bwj.fintrack.grade.GradeType;
+import com.bwj.fintrack.transaction.repository.TransactionRepository;
+import com.bwj.fintrack.user.entity.User;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+
+@Component
+@RequiredArgsConstructor
+public class TransactionLimitValidator {
+
+    private final TransactionRepository transactionRepository;
+
 //    public void validateDailyLimit(User user,
 //                                   BigDecimal requestAmount) {
 //
@@ -39,4 +39,4 @@
 //            throw new CustomException(ErrorCode.DAILY_LIMIT_EXCEEDED);
 //        }
 //    }
-//}
+}
