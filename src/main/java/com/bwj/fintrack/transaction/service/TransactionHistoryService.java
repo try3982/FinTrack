@@ -1,21 +1,18 @@
 package com.bwj.fintrack.transaction.service;
 
-import com.bwj.fintrack.account.entity.Account;
 import com.bwj.fintrack.account.repository.AccountRepository;
 import com.bwj.fintrack.account.service.AccountValidator;
-import com.bwj.fintrack.common.exception.custom.CustomException;
-import com.bwj.fintrack.common.exception.response.ErrorCode;
 import com.bwj.fintrack.transaction.dto.request.TransactionHistoryRequest;
 import com.bwj.fintrack.transaction.dto.response.TransactionHistoryItemResponse;
 import com.bwj.fintrack.transaction.dto.response.TransactionHistoryPageResponse;
-import com.bwj.fintrack.transaction.entity.Transaction;
+import com.bwj.fintrack.transaction.query.BaseTransactionHistoryViewProvider;
+import com.bwj.fintrack.transaction.query.TransactionHistoryViewProvider;
 import com.bwj.fintrack.transaction.repository.TransactionHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,69 +30,19 @@ public class TransactionHistoryService {
     @Transactional(readOnly = true)
     public TransactionHistoryPageResponse getTransactionHistory(TransactionHistoryRequest request) {
 
-        // 1) 요청자 식별 / 권한 검증용 값 존재 확인
-        if (request.userId() == null) {
-            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
-        }
+        // 1) 기본 Provider 생성
+        TransactionHistoryViewProvider provider =
+                new BaseTransactionHistoryViewProvider(
+                        request,
+                        accountRepository,
+                        transactionHistoryRepository
+                );
 
-        // 2) 계좌 로드
-        Account account = accountRepository.findByAccountNumber(request.accountNumber())
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+        List<TransactionHistoryItemResponse> items = provider.items();
+        String nextCursor = provider.nextCursor();
+        boolean hasNext = provider.hasNext();
 
-        // 3) 본인 계좌인지 확인
-        // 여기서는 기존처럼 userId를 직접 비교한다.
-        // (원한다면 아래 비교 로직도 AccountValidator로 옮길 수 있음.
-        //   e.g. accountValidator.validateOwner(account, request.userId()) 형태로 확장)
-        if (account.getUser() == null ||
-                !account.getUser().getId().equals(request.userId())) {
-            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
-        }
-
-        // 4) 기간 계산
-        LocalDateTime from = null;
-        LocalDateTime to = null;
-        if (Boolean.TRUE.equals(request.onlyRecent3Months())) {
-            LocalDateTime now = LocalDateTime.now();
-            to = now;
-            from = now.minus(3, ChronoUnit.MONTHS);
-        }
-
-        // 5) 페이지 사이즈 정규화
-        int size = normalizePageSize(request.size());
-
-        // 6) 커서 정보 파싱
-        LocalDateTime cursorDate = request.cursorDate();
-        UUID cursorId = tryParseUuid(request.cursorId());
-
-        // 7) 조회: size+1 로 next 여부 감지
-        List<Transaction> slice = transactionHistoryRepository.findPageForAccount(
-                account.getId(),
-                request.types(),
-                from,
-                to,
-                size + 1,
-                cursorDate,
-                cursorId
-        );
-
-        boolean hasNext = slice.size() > size;
-        if (hasNext) {
-            slice = slice.subList(0, size);
-        }
-
-        // 8) nextCursor 생성
-        String nextCursor = null;
-        if (hasNext && !slice.isEmpty()) {
-            Transaction last = slice.get(slice.size() - 1);
-            nextCursor = buildCursor(last.getTransactionDate(), last.getId());
-        }
-
-        // 9) DTO 변환
-        List<TransactionHistoryItemResponse> items = slice.stream()
-                .map(TransactionHistoryItemResponse::from)
-                .toList();
-
-        return TransactionHistoryPageResponse.of(items, nextCursor, hasNext);
+        return TransactionHistoryPageResponse.from(items, nextCursor, hasNext);
     }
 
     private int normalizePageSize(Integer size) {
