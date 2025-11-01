@@ -24,13 +24,6 @@ public class AccountController {
 
     private final AccountService accountService;
 
-//    @PostMapping
-//    public ResponseEntity<CreateAccountResponse> createAccount(
-//            @Valid @RequestBody CreateAccountRequest request
-//    ) {
-//        CreateAccountResponse body = accountService.createAccount(request);
-//        return ResponseEntity.status(HttpStatus.CREATED).body(body);
-//    }
 
     @PostMapping("/deposit")
     public ResponseEntity<CreateDepositAccountResponse> createDepositAccount(

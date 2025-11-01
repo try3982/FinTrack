@@ -29,46 +29,46 @@ public class GradePromotionService {
      * 회원 승급 평가 및 반영
      * - 강등은 없다: 올라갈 수 있으면 올리고, 아니면 유지
      */
-    @Transactional
-    public GradePromotionResultResponse evaluateAndPromote(Long userId) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-
-        GradeType current = user.getGrade().getGradeType();
-
-        // 1) KPI 계산
-        BigDecimal totalBalance = getTotalActiveBalance(userId); // 현재 활성 계좌 잔액 합
-        BigDecimal recent30dVolume = getRecent30DaysVolume(userId); // 최근 30일 총 거래 금액
-
-        // 2) 다음 등급이 가능한지 확인
-        GradeType upgraded = decideNextGrade(current, totalBalance, recent30dVolume);
-
-        // 3) 승급 가능하면 반영
-        if (upgraded != current) {
-            user.setGradeType(upgraded); // <-- User 엔티티에 setter 또는 promote 메서드 필요
-            userRepository.save(user);
-        }
-
-        return GradePromotionResultResponse.from(
-                current,
-                upgraded,
-                totalBalance,
-                recent30dVolume
-        );
-    }
+//    @Transactional
+//    public GradePromotionResultResponse evaluateAndPromote(Long userId) {
+//
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+//
+//        GradeType current = user.getGrade().getGradeType();
+//
+//        // 1) KPI 계산
+//        BigDecimal totalBalance = getTotalActiveBalance(userId); // 현재 활성 계좌 잔액 합
+//        BigDecimal recent30dVolume = getRecent30DaysVolume(userId); // 최근 30일 총 거래 금액
+//
+//        // 2) 다음 등급이 가능한지 확인
+//        GradeType upgraded = decideNextGrade(current, totalBalance, recent30dVolume);
+//
+//        // 3) 승급 가능하면 반영
+//        if (upgraded != current) {
+//            user.setGradeType(upgraded); // <-- User 엔티티에 setter 또는 promote 메서드 필요
+//            userRepository.save(user);
+//        }
+//
+//        return GradePromotionResultResponse.from(
+//                current,
+//                upgraded,
+//                totalBalance,
+//                recent30dVolume
+//        );
+//    }
 
     private BigDecimal getTotalActiveBalance(Long userId) {
         BigDecimal sum = accountRepository.sumActiveBalanceByUserId(userId);
         return (sum != null) ? sum : BigDecimal.ZERO;
     }
 
-    private BigDecimal getRecent30DaysVolume(Long userId) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime from = now.minusDays(30);
-        BigDecimal sum = transactionRepository.sumTransactionAmountLast30Days(userId, from, now);
-        return (sum != null) ? sum : BigDecimal.ZERO;
-    }
+//    private BigDecimal getRecent30DaysVolume(Long userId) {
+//        LocalDateTime now = LocalDateTime.now();
+//        LocalDateTime from = now.minusDays(30);
+//        BigDecimal sum = transactionRepository.sumTransactionAmountLast30Days(userId, from, now);
+//        return (sum != null) ? sum : BigDecimal.ZERO;
+//    }
 
     /**
      * 현재 등급과 KPI 기준으로 올라갈 수 있는 등급을 결정.
