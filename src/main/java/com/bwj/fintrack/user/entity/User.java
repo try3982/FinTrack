@@ -1,6 +1,7 @@
 package com.bwj.fintrack.user.entity;
 
 import com.bwj.fintrack.grade.Grade;
+import com.bwj.fintrack.grade.GradeType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -40,4 +41,8 @@ public class User {
     private LocalDate birthDate;
 
     private LocalDateTime createdAt;
+
+    public void promoteTo(GradeType newGradeType) {
+        this.grade.promoteTo(newGradeType);
+    }
 }
