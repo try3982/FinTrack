@@ -9,6 +9,7 @@ import com.bwj.fintrack.account.service.factory.SavingsAccountFactory;
 import com.bwj.fintrack.grade.service.GradePromotionService;
 import com.bwj.fintrack.transaction.command.DepositCommand;
 import com.bwj.fintrack.transaction.command.TransactionExecutor;
+import com.bwj.fintrack.transaction.command.WithdrawCommand;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
 import com.bwj.fintrack.transaction.dto.response.TransferResponse;
@@ -103,44 +104,16 @@ public class AccountService {
     /**
      * 출금
      */
-    @Transactional
     public WithdrawResponse withdraw(WithdrawRequest request) {
 
-      //  gradePromotionService.evaluateAndPromote(request.userId());
-
-        accountValidator.validatePositiveAmount(request.amount());
-        accountValidator.validateMaxTxAmount(request.amount());
-
-        Account account = accountRepository.findWithLockByAccountNumber(request.accountNumber())
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
-
-        accountValidator.validateOwnerPresent(account);
-        accountValidator.validateActive(account);
-
-        BigDecimal amount = normalizeAmount(request.amount());
-
-        // 한도 규제
-        User owner = account.getUser();
-
-        //  등급별 일일 한도 검사
-      //  transactionLimitValidator.validateDailyLimit(owner, amount);
-
-
-
-        // 잔액/최소유지금 정책
-        accountValidator.validateWithdrawPossible(account, amount);
-
-        account.withdraw(amount);
-
-        Transaction tx = Transaction.withdrawalSuccess(
-                account,
-                amount,
-                request.methodType(),
-                request.memo()
+        WithdrawCommand command = new WithdrawCommand(
+                request,
+                accountRepository,
+                transactionRepository,
+                accountValidator
         );
-        Transaction saved = transactionRepository.save(tx);
 
-        return WithdrawResponse.from(saved);
+        return transactionExecutor.execute(command);
     }
 
     /**
