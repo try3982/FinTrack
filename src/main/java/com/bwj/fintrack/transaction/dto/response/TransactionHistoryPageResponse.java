@@ -7,7 +7,7 @@ public record TransactionHistoryPageResponse(
         String nextCursor, // "2025-10-12T09:22:11.331|c7a1b..." 형태
         boolean hasNext
 ) {
-    public static TransactionHistoryPageResponse of(
+    public static TransactionHistoryPageResponse from(
             List<TransactionHistoryItemResponse> items,
             String nextCursor,
             boolean hasNext
