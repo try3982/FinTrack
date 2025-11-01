@@ -4,6 +4,7 @@ package com.bwj.fintrack.account.service;
 import com.bwj.fintrack.account.dto.request.*;
 import com.bwj.fintrack.account.dto.response.*;
 import com.bwj.fintrack.autotransfer.service.TransactionLimitValidator;
+import com.bwj.fintrack.grade.service.GradePromotionService;
 import com.bwj.fintrack.transaction.dto.request.TransferRequest;
 import com.bwj.fintrack.transaction.dto.request.WithdrawRequest;
 import com.bwj.fintrack.transaction.dto.response.TransferResponse;
@@ -39,6 +40,7 @@ public class AccountService {
     private final AccountNumberGenerator numberGenerator;
     private final AccountValidator accountValidator;
     private final TransactionLimitValidator transactionLimitValidator;
+    private final GradePromotionService gradePromotionService;
 
 
 
@@ -160,6 +162,8 @@ public class AccountService {
     @Transactional
     public WithdrawResponse withdraw(WithdrawRequest request) {
 
+        gradePromotionService.evaluateAndPromote(request.userId());
+
         accountValidator.validatePositiveAmount(request.amount());
         accountValidator.validateMaxTxAmount(request.amount());
 
@@ -200,6 +204,8 @@ public class AccountService {
      */
     @Transactional
     public TransferResponse transfer(TransferRequest request) {
+
+        gradePromotionService.evaluateAndPromote(request.userId());
 
         if (request.fromAccountNumber().equals(request.toAccountNumber())) {
             throw new CustomException(ErrorCode.INVALID_AMOUNT);
