@@ -16,21 +16,7 @@ public class AutoTransferController {
 
     private final AutoTransferService autoTransferService;
 
-    /**
-     * 자동이체 규칙 생성
-     *
-     * POST /api/autotransfers
-     *
-     * Body 예:
-     * {
-     *   "userId": 1,
-     *   "fromAccountNumber": "100-2000-0000001",
-     *   "toAccountNumber": "100-2000-0000002",
-     *   "amount": 50000.00,
-     *   "dayOfMonth": 15,
-     *   "runTime": "09:30"
-     * }
-     */
+
     @PostMapping
     public ResponseEntity<CreateAutoTransferResponse> create(
             @Valid @RequestBody CreateAutoTransferRequest request

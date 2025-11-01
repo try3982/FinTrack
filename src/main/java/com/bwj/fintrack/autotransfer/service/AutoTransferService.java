@@ -2,6 +2,7 @@ package com.bwj.fintrack.autotransfer.service;
 
 import com.bwj.fintrack.account.entity.Account;
 import com.bwj.fintrack.account.repository.AccountRepository;
+import com.bwj.fintrack.autotransfer.command.CreateAutoTransferCommand;
 import com.bwj.fintrack.autotransfer.dto.request.CreateAutoTransferRequest;
 import com.bwj.fintrack.autotransfer.dto.response.CreateAutoTransferResponse;
 import com.bwj.fintrack.autotransfer.entity.AutoTransfer;
@@ -27,46 +28,13 @@ public class AutoTransferService {
     @Transactional
     public CreateAutoTransferResponse createAutoTransfer(CreateAutoTransferRequest request) {
 
-        // 1) fromAccount 로드 + 소유자 검증
-        Account from = accountRepository.findByAccountNumber(request.fromAccountNumber())
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
+        // 커맨드에 유스케이스 정책(검증, nextRunAt 계산 등)을 위임
+        CreateAutoTransferCommand command =
+                new CreateAutoTransferCommand(request, accountRepository);
 
-        if (from.getUser() == null ||
-                !from.getUser().getId().equals(request.userId())) {
-            throw new CustomException(ErrorCode.FORBIDDEN_ACCOUNT_ACCESS);
-        }
-        if (!from.isActive()) {
-            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
-        }
+        AutoTransfer schedule = command.buildNewSchedule();
 
-        // 2) toAccount 존재 및 ACTIVE 확인
-        Account to = accountRepository.findByAccountNumber(request.toAccountNumber())
-                .orElseThrow(() -> new CustomException(ErrorCode.ACCOUNT_NOT_FOUND));
-        if (!to.isActive()) {
-            throw new CustomException(ErrorCode.ACCOUNT_NOT_ACTIVE);
-        }
-
-        // 3) nextRunAt 계산
-        LocalDateTime firstNextRunAt = computeInitialNextRunAt(
-                request.dayOfMonth(),
-                request.runTime()
-        );
-
-        // 4) 엔티티 생성
-        AutoTransfer at = AutoTransfer.builder()
-                .fromAccount(from)
-                .toAccountNo(to.getAccountNumber())
-                .amount(request.amount().setScale(2, RoundingMode.HALF_UP))
-                .dayOfMonth(request.dayOfMonth())
-                .runTime(request.runTime())
-                .nextRunAt(firstNextRunAt)
-                .lastRunAt(null)
-                .active(true)
-                .failCount(0)
-                .maxRetries(3)
-                .build();
-
-        AutoTransfer saved = autoTransferRepository.save(at);
+        AutoTransfer saved = autoTransferRepository.save(schedule);
 
         return CreateAutoTransferResponse.from(saved);
     }

@@ -4,6 +4,6 @@ public enum TransactionMethodType {
 
     ATM,
     ONLINE,
-    AUTO
+    AUTO_TRANSFER
 
 }
