@@ -6,10 +6,13 @@
 
 
 
-
 ## ERD
 
 <img width="1510" height="612" alt="FinTrack" src="https://github.com/user-attachments/assets/60b30704-99e6-46f1-aa61-a49c2d1ee68f" />
+
+
+## 입금 시퀀스 다이어그램
+<img width="1510" height="1000" alt="Untitled diagram-2025-11-11-110817" src="https://github.com/user-attachments/assets/8af37fe0-7848-4919-a17e-1524a3e0b6d9" />
 
 
 
